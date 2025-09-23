@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PixelFree – Frontend Test</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="appbar">
+    <div class="brand">
+      <img
+        class="logo-img"
+        src="PixelFree.png"
+        alt="PixelFree"
+        decoding="async"
+      />
+      <span class="sub">Frontend Test</span>
+    </div>
+    <div class="status">
+      <span id="status">Checking auth…</span>
+      <button id="loginBtn" hidden>Connect to Pixelfed</button>
+      <button id="logoutBtn" hidden>Logout</button>
+    </div>
+  </header>
+
+  
+  <section id="controls">
+    <div class="grid-container">
+        <!-- Row 1, Column 1: Tag Mode and Tag Label -->
+        <div class="grid-item">
+            <select id="tagmodeSelect">
+                <option value="Any">Any</option>
+                <option value="All">All</option>
+            </select>
+            <label for="tagmodeSelect">of these <strong>Tags</strong></label>
+        </div>
+
+        <!-- Row 1, Column 2: Users Label -->
+        <div class="grid-item">
+            <label>from any of these <strong>Users</strong></label>
+        </div>
+
+        <!-- Row 1, Column 3: Limit Label -->
+        <div class="grid-item">
+            <label>Limit</label>
+        </div>
+
+        <!-- Row 1, Column 4: Empty -->
+        <div class="grid-item empty"></div>
+
+        <!-- Row 2, Column 1: Tags input field -->
+        <div class="grid-item">
+            <input id="tagsInput" type="text" placeholder="(e.g. #italy #india)">
+        </div>
+
+        <!-- Row 2, Column 2: Users input field -->
+        <div class="grid-item">
+            <input id="usersInput" type="text" placeholder="(e.g. joe@blow.org)">
+        </div>
+
+        <!-- Row 2, Column 3: Limit input field -->
+        <div class="grid-item">
+            <input id="limitInput" type="number" min="1" max="40" value="10">
+        </div>
+
+        <!-- Row 2, Column 4: Search Button -->
+        <div class="grid-item">
+            <button id="searchBtn" type="button">Search</button>
+        </div>
+    </div>
+  </section>
+
+
+  <!-- Message area lives right below the controls -->
+  <div id="notices" aria-live="polite"></div>
+
+  <main class="container">
+    <div id="loadingIndicator" class="loading">
+      <div class="spinner"></div>
+      <span>Loading images…</span>
+    </div>
+
+    <div id="imageGrid" class="grid"></div>
+
+    <div id="empty" class="empty" hidden>No photos yet. Try a tag above.</div>
+  </main>
+
+  <!-- Info Modal -->
+  <div id="infoModal" class="modal" hidden>
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <button id="modalClose" class="modal-close" aria-label="Close">×</button>
+      <div id="modalContent" class="modal-content">
+        <!-- filled by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
