@@ -1,5 +1,5 @@
 /**
- * modules/photoFetcher.js
+ * services/photoFetcher.js
  * -----------------------
  * High-level backend service for retrieving photo posts from a Pixelfed instance.
  *
