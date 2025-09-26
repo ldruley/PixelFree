@@ -166,5 +166,34 @@ async function refreshAlbum(album) {
 }
 
 async function schedulerTick(){
+    if(!isRunning) return;
 
+    const now = new Date().toISOString();
+    stats.last_run_at = now;
+    stats.total_runs++;
+
+    console.log(`[Scheduler] Starting run at ${now}`);
+
+    try {
+        //Get all enabled albums
+        const {items: albums} = albumRepo.list({limit: 1000});
+        const dueAlbums = albums.filter(isDueForRefresh);
+
+        if (dueAlbums.length === 0) {
+            console.log('[Scheduler] No albums due for refresh');
+            return;
+        }
+
+        console.log('[Scheduler] Found', dueAlbums.length, 'due albums');
+        for (const album of dueAlbums) {
+            if (!isRunning) break;
+            await refreshAlbum(album);
+
+            // Delay between refreshes - maybe unnecessary with jitter
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    } catch (error) {
+        console.error('[Scheduler] Error in scheduler run: ', error);
+        stats.errors++;
+    }
 }
