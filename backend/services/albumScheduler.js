@@ -14,7 +14,8 @@
  *
  * TODO:
  *  - Connect to user settings to adjust refresh interval and enable/disable scheduled updates
- *  - Better error handling - handle rate limits, server errors, etc.
+ *  - Verify rate limiting behavior
+ *  - Switch to global settings for album refresh intervals?
  *  - what should we do with max id here?
  */
 
@@ -71,7 +72,7 @@ function isDueForRefresh(album) {
     if (!album.enabled) return false;
 
     const now = new Date();
-    const refresh = JSON.parse(album.refresh_json || '{}');
+    const refresh = JSON.parse(album.refresh || '{}');
     // Check backoff first
     if (refresh.backoff_until) {
         const backoffUntil = new Date(refresh.backoff_until).getTime();
@@ -93,7 +94,7 @@ function isDueForRefresh(album) {
  */
 async function refreshAlbum(album) {
     const albumId = album.id;
-    const refresh = JSON.parse(album.refresh_json || '{}');
+    const refresh = JSON.parse(album.refresh || '{}');
 
     try {
         console.log(`[Scheduler] Refreshing album ${albumId} "${album.name}"`);
@@ -157,14 +158,47 @@ async function refreshAlbum(album) {
 
         albumRepo.update(albumId, {refresh: updatedRefresh});
 
-        console.log(`[Scheduler] Album ${albumId} "${album.name}" refreshed with ${cleanIds.length} new photos`);
+        console.log(`[Scheduler] Album ${albumId} refreshed: ${candidates.length} fetched, ${cleanIds.length} upserted, ${linkedCount} linked`);
         stats.albums_refreshed++;
     } catch (error) {
         console.error(`[Scheduler] Error refreshing album ${albumId} "${album.name}":`, error);
         stats.errors++;
+
+        // Handle rate limiting specially
+        if (error.code === 'rate_limited' || error.message?.includes('429')) {
+            console.log(`[Scheduler] Rate limited on album ${albumId}, applying backoff`);
+            stats.rate_limited++;
+
+            const retryCount = (refresh.retry_count || 0) + 1;
+            const backoffMs = calculateBackoff(retryCount);
+            const backoffUntil = new Date(Date.now() + backoffMs).toISOString();
+
+            const updatedRefresh = {
+                ...refresh,
+                backoff_until: backoffUntil,
+                last_error: error.message,
+                retry_count: retryCount,
+                last_checked_at: new Date().toISOString()
+            };
+
+            albumRepo.update(albumId, { refresh: updatedRefresh });
+        } else {
+            // Other errors - just log, will retry next cycle
+            const updatedRefresh = {
+                ...refresh,
+                last_error: error.message,
+                last_checked_at: new Date().toISOString()
+            };
+
+            albumRepo.update(albumId, { refresh: updatedRefresh });
+        }
     }
 }
 
+/**
+ * Runs the album update scheduler tick.
+ * @returns {Promise<void>}
+ */
 async function schedulerTick(){
     if(!isRunning) return;
 
@@ -196,4 +230,77 @@ async function schedulerTick(){
         console.error('[Scheduler] Error in scheduler run: ', error);
         stats.errors++;
     }
+}
+
+/**
+ * Starts the album update scheduler.
+ */
+export async function startScheduler() {
+    if(isRunning) {
+        console.log('[Scheduler] Already running');
+        return;
+    }
+
+    console.log('[Scheduler] Starting scheduler with interval:', TICK_INTERVAL_MS);
+
+    isRunning = true;
+    stats.started_at = new Date().toISOString();
+    stats.total_runs = 0;
+    stats.albums_refreshed = 0;
+    stats.albums_skipped = 0;
+    stats.errors = 0;
+    stats.rate_limited = 0;
+
+    await schedulerTick();
+
+    schedulerTimer = setInterval(schedulerTick, TICK_INTERVAL_MS);
+    console.log('[Scheduler] Scheduler started');
+}
+
+/**
+ * Stops the album update scheduler.
+ * @returns {Promise<void>}
+ */
+export async function stopScheduler() {
+    if(!isRunning) {
+        console.log('[Scheduler] Not running');
+        return;
+    }
+
+    console.log('[Scheduler] Stopping scheduler');
+    isRunning = false;
+    if (schedulerTimer) {
+        clearInterval(schedulerTimer);
+        schedulerTimer = null;
+    }
+
+    // Allow current operations to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log('[Scheduler] Scheduler stopped');
+}
+
+
+/**
+ * Get current scheduler status and statistics
+ */
+export function getStatus() {
+    return {
+        running: isRunning,
+        tick_interval_ms: TICK_INTERVAL_MS,
+        stats: { ...stats }
+    };
+}
+
+/**
+ * Force refresh of a specific album (bypasses scheduling)
+ */
+export async function forceRefreshAlbum(albumId) {
+    const album = albumRepo.get(albumId);
+    if (!album) {
+        throw new Error('Album not found');
+    }
+
+    console.log(`[Scheduler] Force refresh requested for album ${albumId}`);
+    await refreshAlbum(album);
 }
