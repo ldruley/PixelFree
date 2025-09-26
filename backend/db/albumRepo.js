@@ -61,6 +61,33 @@ export function update(id, patch) {
   return get(id);
 }
 
+/**
+ * Toggle an album's enabled state.'
+ * @param id
+ * @param enabled
+ * @returns {{id, name, enabled: boolean, updated_at: *, message: string}}
+ */
+export function toggle(id, enabled) {
+    const current = get(id);
+    if (!current) throw new Error('AlbumNotFound');
+    const updated_at = nowIso();
+    const enabledValue = enabled ? 1 : 0;
+    db.prepare(`UPDATE albums SET enabled=?, updated_at=? WHERE id=?`)
+      .run(enabledValue, updated_at, id);
+
+    const updated = get(id);
+
+    console.log(`[AlbumRepo] Toggled album ${id} to ${enabled ? 'enabled' : 'disabled'}`);
+
+    return {
+        id: updated.id,
+        name: updated.name,
+        enabled: Boolean(updated.enabled),
+        updated_at: updated.updated_at,
+        message: `Album ${enabled ? 'enabled' : 'disabled'} successfully`
+    };
+}
+
 export function remove(id) {
   db.prepare('DELETE FROM albums WHERE id=?').run(id);
 }
