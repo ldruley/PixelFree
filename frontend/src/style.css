@@ -1,0 +1,19 @@
+/* Basic error styling */
+.error-message {
+  color: #dc2626;
+}
+
+/* Success banner styling */
+.success-banner {
+  background-color: #d1fae5;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  color: #065f46;
+}
+
+.success-banner p {
+  margin: 0;
+  font-weight: 500;
+}
