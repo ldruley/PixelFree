@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const LoginPage: React.FC = () => {
   const { authStatus, isLoading, login } = useAuth()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  // Redirect if already authenticated
+  // Check for authentication success parameter
   useEffect(() => {
-    if (authStatus.isAuthenticated) {
+    if (searchParams.get('auth') === 'success') {
+      setShowSuccess(true)
+      // Remove the auth parameter from URL
+      setSearchParams({})
+      // Hide success message after 5 seconds, then redirect
+      setTimeout(() => {
+        setShowSuccess(false)
+        if (authStatus.isAuthenticated) {
+          navigate('/albums')
+        }
+      }, 5000)
+    }
+  }, [searchParams, setSearchParams, authStatus.isAuthenticated, navigate])
+
+  // Redirect if already authenticated (but not if showing success message - this will take user to album for more guided flow  )
+  useEffect(() => {
+    if (authStatus.isAuthenticated && !showSuccess) {
       navigate('/albums')
     }
-  }, [authStatus.isAuthenticated, navigate])
+  }, [authStatus.isAuthenticated, navigate, showSuccess])
 
   const handleLogin = async () => {
     try {
@@ -40,6 +58,13 @@ const LoginPage: React.FC = () => {
 
   return (
     <div>
+      {showSuccess && (
+        <div className="success-banner">
+          <p> Successfully connected to Pixelfed! You are now authenticated.</p>
+          <p><small>Redirecting to albums in a few seconds...</small></p>
+        </div>
+      )}
+      
       <div>
         <h1>
           Connect to PixelFree

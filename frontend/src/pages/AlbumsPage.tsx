@@ -1,28 +1,32 @@
-import React, { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { getSamplePhotos } from '../services/photoService'
+import type { Photo } from '../services/photoService'
 
 const AlbumsPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
+  // Fetch sample photos on component mount
   useEffect(() => {
-    // Check if we were redirected here after successful authentication
-    if (searchParams.get('auth') === 'success') {
-      setShowSuccess(true)
-      // Remove the auth parameter from URL
-      setSearchParams({})
-      // Hide success message after 5 seconds
-      setTimeout(() => setShowSuccess(false), 5000)
+    const fetchPhotos = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const samplePhotos = await getSamplePhotos()
+        setPhotos(samplePhotos)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load photos')
+        console.error('Error fetching photos:', err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [searchParams, setSearchParams])
+
+    fetchPhotos()
+  }, [])
   return (
     <div>
-      {showSuccess && (
-        <div className="success-banner">
-          <p>✅ Successfully connected to Pixelfed! You are now authenticated.</p>
-        </div>
-      )}
-      
       <div>
         <h1>Album Management</h1>
         <button>
@@ -98,6 +102,75 @@ const AlbumsPage: React.FC = () => {
             Save Album
           </button>
         </form>
+      </div>
+      
+      {/* Photo Grid Section */}
+      <div>
+        <h2>Testing Photo Call Here </h2>
+        
+        {error && (
+          <div className="error-message">
+            <p>{error}</p>
+          </div>
+        )}
+        
+        {isLoading ? (
+          <div>
+            <p>Loading photos...</p>
+          </div>
+        ) : (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+            gap: '16px',
+            marginTop: '16px'
+          }}>
+            {photos.length > 0 ? (
+              photos.map((photo) => (
+                <div key={photo.id} style={{
+                  border: '1px solid #ccc',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  backgroundColor: '#f9f9f9'
+                }}>
+                  <img 
+                    src={photo.preview_url || photo.url} 
+                    alt={photo.caption || 'Photo'}
+                    style={{
+                      width: '100%',
+                      height: '150px',
+                      objectFit: 'cover'
+                    }}
+                    loading="lazy"
+                  />
+                  <div style={{ padding: '8px' }}>
+                    <p style={{ 
+                      margin: '0', 
+                      fontSize: '12px', 
+                      color: '#666',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {photo.author_display_name || photo.author?.username || 'Unknown'}
+                    </p>
+                    {photo.tags && photo.tags.length > 0 && (
+                      <p style={{ 
+                        margin: '4px 0 0 0', 
+                        fontSize: '10px', 
+                        color: '#999'
+                      }}>
+                        #{photo.tags.slice(0, 3).join(' #')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p>No photos found. Try authenticating with Pixelfed first.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

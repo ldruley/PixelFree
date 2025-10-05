@@ -21,7 +21,7 @@ export default function mountAuthRoutes(app) {
   router.get('/callback', wrap(async (req, res) => {
     console.log('[API] GET /api/callback' /*, req.query */);
     await auth.handleCallback(req.query);   // exchanges code + saves .token.json
-    res.redirect('http://localhost:5173/albums?auth=success'); // redirect to React frontend
+    res.redirect('http://localhost:5173/login?auth=success'); // redirect to login page with success
   }));
 
   // GET /api/auth/status → return current auth status JSON
