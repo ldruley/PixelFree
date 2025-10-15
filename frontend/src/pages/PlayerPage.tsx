@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSamplePhotos, type Photo } from '../services/photoService'
+import type { Photo } from '../services/photoService'
+import { getAlbumPhotos, listAlbums } from '../services/albumService'
 import { useSettings } from '../contexts/SettingsContext'
 
 const PlayerPage: React.FC = () => {
@@ -33,25 +34,51 @@ const PlayerPage: React.FC = () => {
     return shuffled
   }
 
-  // Load photos on component mount
+  // Load photos from active album
   useEffect(() => {
     const loadPhotos = async () => {
       try {
         setLoading(true)
-        const fetchedPhotos = await getSamplePhotos()
-        if (fetchedPhotos.length === 0) {
-          setError('No photos available')
+        setError(null)
+        
+        // Get all albums
+        const albumsResponse = await listAlbums({ limit: 100 })
+        
+        // Find the active album based on settings
+        let activeAlbum = albumsResponse.items.find(a => a.id === settings.activeAlbum)
+        
+        // Fallback to first enabled album if active album not found
+        if (!activeAlbum) {
+          activeAlbum = albumsResponse.items.find(a => a.enabled)
+        }
+        
+        // Fallback to favorites
+        if (!activeAlbum) {
+          activeAlbum = albumsResponse.items.find(a => a.id === 'favorites_builtin')
+        }
+        
+        if (!activeAlbum) {
+          setError('No albums available. Please create an album first.')
           return
         }
-        setPhotos(fetchedPhotos)
+        
+        // Fetch photos from the active album
+        const photosResponse = await getAlbumPhotos(activeAlbum.id, { limit: settings.maxImages || 100 })
+        
+        if (photosResponse.items.length === 0) {
+          setError(`No photos in album "${activeAlbum.name}". Try refreshing the album.`)
+          return
+        }
+        
+        setPhotos(photosResponse.items)
         
         // Initialize shuffled indices
-        const indices = Array.from({ length: fetchedPhotos.length }, (_, i) => i)
+        const indices = Array.from({ length: photosResponse.items.length }, (_, i) => i)
         const shuffled = shuffleArray(indices)
         setShuffledIndices(shuffled)
         setCurrentIndex(0)
       } catch (err) {
-        setError('Failed to load photos')
+        setError('Failed to load photos from album')
         console.error('Error loading photos:', err)
       } finally {
         setLoading(false)
@@ -59,7 +86,7 @@ const PlayerPage: React.FC = () => {
     }
 
     loadPhotos()
-  }, [])
+  }, [settings.activeAlbum, settings.maxImages])
 
   // Get photos for different layouts
   const getPhotosForLayout = () => {

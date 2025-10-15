@@ -1,179 +1,259 @@
-import React, { useState, useEffect } from 'react'
-import { getSamplePhotos } from '../services/photoService'
-import type { Photo } from '../services/photoService'
+import React, { useState, useEffect } from 'react';
+import AlbumCard from '../components/AlbumCard';
+import AlbumForm from '../components/AlbumForm';
+import type { Album, CreateAlbumRequest } from '../services/albumService';
+import {
+  listAlbums,
+  createAlbum,
+  updateAlbum,
+  deleteAlbum,
+  toggleAlbum,
+  refreshAlbum,
+} from '../services/albumService';
+
+const FAVORITES_ALBUM_ID = 'favorites_builtin';
 
 const AlbumsPage: React.FC = () => {
-  const [photos, setPhotos] = useState<Photo[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Form state
+  const [showForm, setShowForm] = useState(false);
+  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
 
-  // Fetch sample photos on component mount
+  // Built-in Favorites album
+  const [favoritesAlbum, setFavoritesAlbum] = useState<Album | null>(null);
+  const [isCreatingFavorites, setIsCreatingFavorites] = useState(false);
+
+  // Load albums on mount
   useEffect(() => {
-    const fetchPhotos = async () => {
+    loadAlbums();
+  }, []);
+
+  const loadAlbums = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await listAlbums({ limit: 100 });
+      
+      // Separate favorites from other albums
+      const favorites = response.items.find(a => a.id === FAVORITES_ALBUM_ID);
+      const regular = response.items.filter(a => a.id !== FAVORITES_ALBUM_ID);
+      
+      setFavoritesAlbum(favorites || null);
+      setAlbums(regular);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load albums');
+      console.error('Error loading albums:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateAlbum = async (data: CreateAlbumRequest) => {
+    try {
+      const newAlbum = await createAlbum(data);
+      setShowForm(false);
+      
+      // Show a loading message
+      setError(null);
+      
+      // Automatically fetch photos for the new album
       try {
-        setIsLoading(true)
-        setError(null)
-        const samplePhotos = await getSamplePhotos()
-        setPhotos(samplePhotos)
+        const refreshResult = await refreshAlbum(newAlbum.id);
+        console.log('Album refresh result:', refreshResult);
+        
+        if (refreshResult.fetched === 0) {
+          alert(`Album "${newAlbum.name}" created, but no photos were found. This could mean:\n\n` +
+                `• The tag/user has no recent posts\n` +
+                `• You may not have access to view those posts\n` +
+                `• Try a different tag or user\n\n` +
+                `You can manually refresh the album later.`);
+        } else {
+          alert(`Album "${newAlbum.name}" created successfully!\n\n` +
+                `Fetched: ${refreshResult.fetched} photos\n` +
+                `Added: ${refreshResult.linked} photos to album`);
+        }
+      } catch (refreshErr) {
+        console.error('Failed to fetch photos for new album:', refreshErr);
+        alert(`Album "${newAlbum.name}" created, but failed to fetch photos.\n\n` +
+              `Error: ${refreshErr instanceof Error ? refreshErr.message : 'Unknown error'}\n\n` +
+              `You can try refreshing the album manually from the Albums page.`);
+      }
+      
+      await loadAlbums();
+    } catch (err) {
+      console.error('Failed to create album:', err);
+      throw err;
+    }
+  };
+
+  const handleUpdateAlbum = async (data: CreateAlbumRequest) => {
+    if (editingAlbum) {
+      await updateAlbum(editingAlbum.id, data);
+      await loadAlbums();
+      setShowForm(false);
+      setEditingAlbum(null);
+    }
+  };
+
+  const handleEditAlbum = (album: Album) => {
+    setEditingAlbum(album);
+    setShowForm(true);
+  };
+
+  const handleDeleteAlbum = async (album: Album) => {
+    if (confirm(`Are you sure you want to delete "${album.name}"?`)) {
+      try {
+        await deleteAlbum(album.id);
+        await loadAlbums();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load photos')
-        console.error('Error fetching photos:', err)
-      } finally {
-        setIsLoading(false)
+        alert(err instanceof Error ? err.message : 'Failed to delete album');
       }
     }
+  };
 
-    fetchPhotos()
-  }, [])
+  const handleToggleAlbum = async (album: Album, enabled: boolean) => {
+    try {
+      await toggleAlbum(album.id, enabled);
+      await loadAlbums();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to toggle album');
+    }
+  };
+
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingAlbum(null);
+  };
+
+  const handleNewAlbum = () => {
+    setEditingAlbum(null);
+    setShowForm(true);
+  };
+
+  // Create Favorites album if it doesn't exist
+  const createFavoritesAlbum = async () => {
+    // Prevent duplicate creation
+    if (isCreatingFavorites || favoritesAlbum) {
+      return;
+    }
+
+    try {
+      setIsCreatingFavorites(true);
+      
+      // Double-check that it doesn't exist
+      const response = await listAlbums({ limit: 100 });
+      const existing = response.items.find(a => a.id === FAVORITES_ALBUM_ID);
+      
+      if (existing) {
+        setFavoritesAlbum(existing);
+        return;
+      }
+
+      await createAlbum({
+        id: FAVORITES_ALBUM_ID, // Use the specific ID for favorites
+        name: 'Favorites',
+        query: {
+          type: 'tag',
+          tags: ['favorites'],
+          tagmode: 'any',
+          limit: 40,
+        },
+        refresh: {
+          intervalMs: 600000, // 10 minutes
+        },
+        enabled: true,
+      });
+      await loadAlbums();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create Favorites album');
+    } finally {
+      setIsCreatingFavorites(false);
+    }
+  };
+
   return (
-    <div>
-      <div>
-        <h1>Album Management</h1>
-        <button>
-          Create New Album
+    <div className="page-container">
+      {/* Simple Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Albums</h1>
+        </div>
+        <button className="btn btn-primary" onClick={handleNewAlbum}>
+          + Create New Album
         </button>
       </div>
-      
-      <div>
-        {/* Album Cards Placeholder */}
-        <div>
-          <h3>Favorites</h3>
-          <p>Built-in album for favorite photos</p>
-          <div>
-            <button>
-              Edit
-            </button>
-            <button>
-              Delete
-            </button>
-          </div>
-        </div>
-        
-        <div>
-          <h3>Sample Album</h3>
-          <p>Tags: family, vacation</p>
-          <p>Users: @john@example.com</p>
-          <div>
-            <button>
-              Edit
-            </button>
-            <button>
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Create/Edit Form Placeholder */}
-      <div>
-        <h2>Create New Album</h2>
-        <form>
-          <div>
-            <label>
-              Album Name
-            </label>
-            <input
-              type="text"
-              placeholder="Enter album name"
-            />
-          </div>
-          
-          <div>
-            <label>
-              Tags (comma separated)
-            </label>
-            <input
-              type="text"
-              placeholder="family, vacation, pets"
-            />
-          </div>
-          
-          <div>
-            <label>
-              Users (@user@server)
-            </label>
-            <input
-              type="text"
-              placeholder="@john@example.com, @jane@example.com"
-            />
-          </div>
-          
-          <button type="submit">
-            Save Album
-          </button>
-        </form>
-      </div>
-      
-      {/* Photo Grid Section */}
-      <div>
-        <h2>Testing Photo Call Here </h2>
-        
-        {error && (
-          <div className="error-message">
-            <p>{error}</p>
-          </div>
-        )}
-        
-        {isLoading ? (
-          <div>
-            <p>Loading photos...</p>
-          </div>
-        ) : (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
-            gap: '16px',
-            marginTop: '16px'
-          }}>
-            {photos.length > 0 ? (
-              photos.map((photo) => (
-                <div key={photo.id} style={{
-                  border: '1px solid #ccc',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  backgroundColor: '#f9f9f9'
-                }}>
-                  <img 
-                    src={photo.preview_url || photo.url} 
-                    alt={photo.caption || 'Photo'}
-                    style={{
-                      width: '100%',
-                      height: '150px',
-                      objectFit: 'cover'
-                    }}
-                    loading="lazy"
-                  />
-                  <div style={{ padding: '8px' }}>
-                    <p style={{ 
-                      margin: '0', 
-                      fontSize: '12px', 
-                      color: '#666',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {photo.author_display_name || photo.author?.username || 'Unknown'}
-                    </p>
-                    {photo.tags && photo.tags.length > 0 && (
-                      <p style={{ 
-                        margin: '4px 0 0 0', 
-                        fontSize: '10px', 
-                        color: '#999'
-                      }}>
-                        #{photo.tags.slice(0, 3).join(' #')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p>No photos found. Try authenticating with Pixelfed first.</p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
-export default AlbumsPage
+      {error && (
+        <div className="error-banner">
+          {error}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="empty-state">
+          Loading albums...
+        </div>
+      ) : (
+        <>
+          {/* Favorites */}
+          {favoritesAlbum && (
+            <div className="section-divider">
+              <h2 className="section-header">Favorites</h2>
+              <AlbumCard
+                album={favoritesAlbum}
+                isFavorites={true}
+                onEdit={handleEditAlbum}
+                onDelete={handleDeleteAlbum}
+                onToggle={handleToggleAlbum}
+              />
+            </div>
+          )}
+
+          {/* Your Albums */}
+          {albums.length > 0 && favoritesAlbum && (
+            <h2 className="section-header">Your Albums</h2>
+          )}
+          
+          {albums.length > 0 ? (
+            <div className="albums-grid">
+              {albums.map((album) => (
+                <AlbumCard
+                  key={album.id}
+                  album={album}
+                  onEdit={handleEditAlbum}
+                  onDelete={handleDeleteAlbum}
+                  onToggle={handleToggleAlbum}
+                />
+              ))}
+            </div>
+          ) : !favoritesAlbum ? (
+            <div className="empty-state">
+              <p className="empty-state-message">No albums yet</p>
+              <button className="btn btn-primary" onClick={handleNewAlbum}>
+                Create Album
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Album Form Modal */}
+      {showForm && (
+        <div className="modal-overlay" onClick={handleFormClose}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <AlbumForm
+              album={editingAlbum}
+              onSave={editingAlbum ? handleUpdateAlbum : handleCreateAlbum}
+              onCancel={handleFormClose}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AlbumsPage;

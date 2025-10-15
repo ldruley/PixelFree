@@ -48,8 +48,9 @@ const LoginPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div>
-        <div>
+      <div className="page-container">
+        <div className="loading-container">
+          <div className="spinner"></div>
           <p>Checking authentication status...</p>
         </div>
       </div>
@@ -57,26 +58,31 @@ const LoginPage: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="page-container">
       {showSuccess && (
         <div className="success-banner">
-          <p> Successfully connected to Pixelfed! You are now authenticated.</p>
-          <p><small>Redirecting to albums in a few seconds...</small></p>
+          <p className="success-banner-title">
+            Successfully connected to Pixelfed! You are now authenticated.
+          </p>
+          <p className="success-banner-message">
+            Redirecting to albums in a few seconds...
+          </p>
         </div>
       )}
       
-      <div>
-        <h1>
+      <div className="card centered-card">
+        <h1 className="page-title centered-title">
           Connect to PixelFree
         </h1>
         
-        <div>
-          <p>
+        <div className="card-body">
+          <p className="centered-text">
             PixelFree connects to your Pixelfed account to display your photos.
             Click the button below to sign in with Pixelfed.
           </p>
           
           <button 
+            className="btn btn-primary btn-large btn-full"
             onClick={handleLogin}
             disabled={isLoggingIn}
           >
@@ -84,21 +90,15 @@ const LoginPage: React.FC = () => {
           </button>
           
           {error && (
-            <div>
-              <p className="error-message">
-                {error}
-              </p>
+            <div className="form-error">
+              {error}
             </div>
           )}
           
-          <div>
-            <p>
-              <small>
-                You'll be redirected to Pixelfed to authorize PixelFree.
-                After authorization, you'll return here automatically.
-              </small>
-            </p>
-          </div>
+          <p className="form-help-text help-text-centered">
+            You'll be redirected to Pixelfed to authorize PixelFree.
+            After authorization, you'll return here automatically.
+          </p>
         </div>
       </div>
     </div>
