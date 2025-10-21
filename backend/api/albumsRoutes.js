@@ -323,10 +323,20 @@ export default function mountAlbumRoutes(app) {
       const headroom  = Math.min(baseLimit * 3, 120);
 
       // Fetch candidates based on album type
+      console.log(`[Album Refresh] Starting refresh for album ${row.id}:`, {
+        type,
+        tags,
+        users,
+        tagmode,
+        headroom
+      });
+
       let candidates = [];
       if (type === 'tag') {
         // For tagmode='all', fetcher should locally AND-match tags
+        console.log(`[Album Refresh] Fetching photos for tags:`, tags);
         candidates = await photoFetcher.getLatestPhotosForTags(tags, { limit: headroom, tagmode });
+        console.log(`[Album Refresh] Fetched ${candidates.length} photos for tags`);
       } else if (type === 'user') {
         // If you store accts instead, resolve before calling
         candidates = await photoFetcher.getLatestPhotosForUsers(users, { limit: headroom });
@@ -338,6 +348,8 @@ export default function mountAlbumRoutes(app) {
         );
       }
       candidates = Array.isArray(candidates) ? candidates : [];
+      
+      console.log(`[Album Refresh] Total candidates after fetch: ${candidates.length}`);
 
       // Upsert photos into DB → expect array of status_ids back
       const upsertedIdsRaw = photoRepo.upsertMany ? photoRepo.upsertMany(candidates) : [];

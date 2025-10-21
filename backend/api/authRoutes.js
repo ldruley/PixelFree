@@ -17,11 +17,11 @@ export default function mountAuthRoutes(app) {
     res.json({ loginUrl });
   });
 
-  // GET /api/callback → exchange code, save token, then redirect (to '/')
+  // GET /api/callback → exchange code, save token, then redirect to frontend
   router.get('/callback', wrap(async (req, res) => {
     console.log('[API] GET /api/callback' /*, req.query */);
     await auth.handleCallback(req.query);   // exchanges code + saves .token.json
-    res.redirect('/');                      // or res.redirect('/api/auth/status')
+    res.redirect('http://localhost:5173/login?auth=success'); // redirect to login page with success
   }));
 
   // GET /api/auth/status → return current auth status JSON

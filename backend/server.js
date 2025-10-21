@@ -44,21 +44,7 @@ const PORT = process.env.PORT || 3000;
 // JSON body parsing
 app.use(express.json());
 
-// Serve static frontend test files from the "public" directory.
-//
-// This is here to support a minimal, throwaway frontend for testing the backend’s
-// Pixelfed authentication and photo-fetch flow without requiring a full frontend
-// build or separate dev server. It allows us to open a browser at the backend’s URL
-// (e.g., http://localhost:3000) and interact with a basic HTML/JS page.
-//
-// Best practice: In the long term, we should remove or replace this with a proper
-// dedicated frontend project (e.g., React or Vue) in its own directory, using a
-// development proxy to the backend during local development. Keeping this here
-// too long can lead to confusion between the test UI and the production UI.
-//
-// TL;DR — Small frontend to test the backend. Not for production!
-
-app.use(express.static('public'));
+// Static frontend removed - using dedicated React frontend at localhost:5173
 
 // --- Import modules ---
 import mountAlbumRoutes from './api/albumsRoutes.js';
@@ -72,9 +58,13 @@ import { ValidationError } from './modules/errors.js';
 
 // --- API Routes ---
 
-// Root
+// Root - API only endpoint
 app.get('/', (_req, res) => {
-  res.type('text').send('PixelFree backend is running. Try /api/photos');
+  res.json({ 
+    message: 'PixelFree backend API is running',
+    frontend: 'http://localhost:5173',
+    endpoints: ['/api/auth', '/api/photos', '/api/health']
+  });
 });
 
 mountPhotosRoutes(app);
@@ -87,8 +77,9 @@ mountAlbumRoutes(app, {
 
 // --- Start server ---
 app.listen(PORT, () => {
-  console.log(`✅ PixelFree backend listening at http://localhost:${PORT}`);
-  console.log(`   Navigate to http://localhost:${PORT}/`);
+  console.log(`PixelFree backend API listening at http://localhost:${PORT}`);
+  console.log(`Frontend available at http://localhost:5173`);
+  console.log(`API endpoints: /api/auth, /api/photos, /api/health`);
 });
 
 // Final error mapper (must be after all routes/middleware)
