@@ -57,7 +57,17 @@ CREATE TABLE IF NOT EXISTS media_manifest (
   FOREIGN KEY (status_id) REFERENCES photos(status_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS favorites (
+  status_id         TEXT PRIMARY KEY,
+  favorited_at      TEXT NOT NULL,
+  note              TEXT,           -- Optional note, can be removed
+  FOREIGN KEY (status_id) REFERENCES photos(status_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS kv (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
 );
+
+-- Index for sorting by favorited_at (newest first)
+CREATE INDEX IF NOT EXISTS idx_favorites_favorited_at ON favorites(favorited_at DESC);
