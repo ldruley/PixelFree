@@ -25,7 +25,7 @@ export default function mountSchedulerRoutes(app) {
         console.log('[API] POST /api/scheduler/stop');
         scheduler.stop();
         res.json({ status: 'Scheduler stopped' });
-    })
+    });
 
     app.use('/api/scheduler', router);
 }
