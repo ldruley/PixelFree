@@ -87,9 +87,11 @@ app.listen(PORT, () => {
   console.log(`API endpoints: /api/auth, /api/photos, /api/health`);
 });
 
-console.log('[Startup] Starting album refresh scheduler...');
-await albumScheduler.startScheduler();
-console.log('[Startup] Album scheduler started successfully');
+(async () => {
+  console.log('[Startup] Starting album refresh scheduler...');
+  await albumScheduler.startScheduler();
+  console.log('[Startup] Album scheduler started successfully');
+})();
 
 // Final error mapper (must be after all routes/middleware)
 app.use(errorMapper);
