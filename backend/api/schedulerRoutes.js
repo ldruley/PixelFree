@@ -13,16 +13,16 @@ export default function mountSchedulerRoutes(app) {
         res.json({ status });
     });
 
-    //GET /api/scheduler/start
-    router.get('/start', (_req, res) => {
-        console.log('[API] GET /api/scheduler/start');
+    //POST /api/scheduler/start
+    router.post('/start', (_req, res) => {
+        console.log('[API] POST /api/scheduler/start');
         scheduler.start();
         res.json({ status: 'Scheduler started' });
     })
 
-    //GET /api/scheduler/stop
-    router.get('/stop', (_req, res) => {
-        console.log('[API] GET /api/scheduler/stop');
+    //POST /api/scheduler/stop
+    router.post('/stop', (_req, res) => {
+        console.log('[API] POST /api/scheduler/stop');
         scheduler.stop();
         res.json({ status: 'Scheduler stopped' });
     })
