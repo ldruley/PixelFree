@@ -44,6 +44,9 @@ const PORT = process.env.PORT || 3000;
 // JSON body parsing
 app.use(express.json());
 
+// Import scheduler service
+import * as albumScheduler from './services/albumScheduler.js';
+
 // Static frontend removed - using dedicated React frontend at localhost:5173
 
 // --- Import modules ---
@@ -55,6 +58,7 @@ import mountHealthRoutes from './api/healthRoutes.js';
 
 import { asyncHandler, errorMapper } from './utils/errorMapper.js';
 import { ValidationError } from './modules/errors.js';
+import mountSchedulerRoutes from "./api/schedulerRoutes.js";
 
 // --- API Routes ---
 
@@ -63,7 +67,7 @@ app.get('/', (_req, res) => {
   res.json({ 
     message: 'PixelFree backend API is running',
     frontend: 'http://localhost:5173',
-    endpoints: ['/api/auth', '/api/photos', '/api/health']
+    endpoints: ['/api/auth', '/api/photos', '/api/albums', '/api/scheduler', '/api/health']
   });
 });
 
@@ -74,6 +78,7 @@ mountHealthRoutes(app);
 mountAlbumRoutes(app, {
   // ensureAuthed, // uncomment if you want to require auth
 });
+mountSchedulerRoutes(app);
 
 // --- Start server ---
 app.listen(PORT, () => {
@@ -81,6 +86,10 @@ app.listen(PORT, () => {
   console.log(`Frontend available at http://localhost:5173`);
   console.log(`API endpoints: /api/auth, /api/photos, /api/health`);
 });
+
+console.log('[Startup] Starting album refresh scheduler...');
+await albumScheduler.startScheduler();
+console.log('[Startup] Album scheduler started successfully');
 
 // Final error mapper (must be after all routes/middleware)
 app.use(errorMapper);
