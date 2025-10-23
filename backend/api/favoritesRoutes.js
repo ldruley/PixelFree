@@ -6,7 +6,9 @@ import * as favoritesRepo from '../db/favoritesRepo.js';
 import * as photoRepo from '../db/photoRepo.js';
 import { ensureAuthed } from '../utils/authMiddleware.js';
 import { ValidationError } from '../modules/errors.js';
-import {mapPhotoRow} from "./albumsRoutes.js";
+import {mapPhotoRow} from "../utils/helpers.js";
+
+// TODO: consider adding batch endpoints
 
 export default function mountFavoritesRoutes(app) {
     const router = express.Router();
