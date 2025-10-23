@@ -55,7 +55,8 @@ export default function mountAlbumRoutes(app) {
     };
   }
 
-  function mapPhotoRow(row) {
+  //TODO: consider moving to a helper file
+  export function mapPhotoRow(row) {
     // tags_json → tags[]
     let tags = [];
     if (row?.tags_json) {
