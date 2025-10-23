@@ -6,7 +6,8 @@
   "description": "Starter backend with stubbed modules for PixelFree",
   "scripts": {
     "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js"
+    "dev": "NODE_ENV=development node server.js",
+    "test": "vitest"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
