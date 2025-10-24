@@ -9,6 +9,7 @@ import { ValidationError } from '../modules/errors.js';
 import {mapPhotoRow} from "../utils/helpers.js";
 
 // TODO: consider adding batch endpoints
+// TODO: use error module for errors
 
 export default function mountFavoritesRoutes(app) {
     const router = express.Router();
@@ -23,8 +24,8 @@ export default function mountFavoritesRoutes(app) {
     // Add a photo to favorites
     router.post('/:statusId', (req, res) => {
         try {
-            const statusID = Number(req.params.statusId);
-            if (!Number.isFinite(statusID)) {
+            const statusId = req.params.statusId;
+            if (!Number.isFinite(statusId)) {
                 return res.status(400).json({
                     error: {
                         code: 'BadRequest',
@@ -35,7 +36,7 @@ export default function mountFavoritesRoutes(app) {
             const {note} = req.body || {};
 
             // Check if photo exists in photos table
-            const photos = photoRepo.getMany([statusID]);
+            const photos = photoRepo.getMany([statusId]);
             if (!photos || photos.length === 0) {
                 return res.status(400).json({
                     error: {
@@ -45,7 +46,7 @@ export default function mountFavoritesRoutes(app) {
                 });
             }
 
-            const result = favoritesRepo.addFavorite(statusID, note || null);
+            const result = favoritesRepo.addFavorite(statusId, note || null);
             console.log(`[Favorites] Added ${statusId} to favorites`);
             res.status(201).json({
                 statusId: result.statusId,
@@ -68,8 +69,8 @@ export default function mountFavoritesRoutes(app) {
     // Remove a photo from favorites
     router.delete('/:statusId', (req, res) => {
         try {
-            const statusID = Number(req.params.statusId);
-            if (!Number.isFinite(statusID)) {
+            const statusId = req.params.statusId;
+            if (!Number.isFinite(statusId)) {
                 return res.status(400).json({
                     error: {
                         code: 'BadRequest',
@@ -77,7 +78,7 @@ export default function mountFavoritesRoutes(app) {
                     }
                 });
             }
-            const removed = favoritesRepo.removeFavorite(statusID);
+            const removed = favoritesRepo.removeFavorite(statusId);
             if(!removed) {
                 return res.status(404).json({
                     error: {
@@ -103,8 +104,8 @@ export default function mountFavoritesRoutes(app) {
     // Get a photo's favorites status
     router.get('/:statusId', (req, res) => {
         try {
-            const statusId = Number(req.params.statusId);
-            if (!Number.isFinite(statusID)) {
+            const statusId = req.params.statusId;
+            if (!Number.isFinite(statusId)) {
                 return res.status(400).json({
                     error: {
                         code: 'BadRequest',
