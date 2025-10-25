@@ -16,6 +16,8 @@ import * as albumRepo from '../db/albumRepo.js';
 import * as photoFetcher from './photoFetcher.js';
 import * as photoRepo from '../db/photoRepo.js';
 import { getSettings } from '../modules/settings.js';
+import {shapeAlbumRows} from "./albumService.js";
+import * as albumService from "./albumService.js";
 
 let schedulerTimer = null;
 let isRunning = false;
@@ -74,7 +76,7 @@ function isDueForRefresh(album) {
     if (!album.enabled) return false;
 
     const now = new Date();
-    const refresh = JSON.parse(album.refresh_json || '{}');
+    const refresh = album.refresh || {};
 
     if (refresh.backoff_until) {
         const backoffUntil = new Date(refresh.backoff_until).getTime();
@@ -83,120 +85,13 @@ function isDueForRefresh(album) {
         }
     }
 
-    const lastChecked = refresh.last_checked_at ? new Date(refresh.last_checked_at).getTime() : 0;
+    const lastChecked = refresh.last_checked_at
+        ? new Date(refresh.last_checked_at).getTime()
+        : 0;
     const refreshInterval = refresh.refresh_interval_ms || getDefaultRefreshInterval();
     const jitteredInterval = addJitter(refreshInterval);
+
     return now >= (lastChecked + jitteredInterval);
-}
-
-/**
- * Refreshes a single album by fetching latest photos and updating the database.
- * @param album
- * @returns {Promise<void>}
- */
-async function refreshAlbum(album) {
-    const albumId = album.id;
-    const refresh = JSON.parse(album.refresh_json || '{}');
-
-    try {
-        console.log(`[Scheduler] Refreshing album ${albumId} "${album.name}"`);
-
-        // Parse query components
-        const type = album.query_type || 'tag';
-        const tags = album.query_tags ? JSON.parse(album.query_tags) : [];
-        const users = album.query_users ? JSON.parse(album.query_users) : [];
-        const tagmode = album.query_tagmode || 'any';
-        const limit = album.query_limit || 20;
-        const headroom = Math.min(limit * 5, 200); // extra room for filtering
-
-        const fetchParams = {
-            limit: headroom,
-            tagmode,
-            since_id: refresh.since_id || null,
-        };
-
-        let candidates = [];
-
-        if (type === 'tag') {
-            candidates = await photoFetcher.getLatestPhotosForTags(tags, fetchParams);
-        } else if (type === 'user') {
-            candidates = await photoFetcher.getLatestPhotosForUsers(users, fetchParams);
-        } else if (type === 'compound') {
-            candidates = await photoFetcher.getLatestPhotosCompound({tags, accountIds: users}, fetchParams);
-        }
-
-        candidates = Array.isArray(candidates) ? candidates : [];
-
-        // Upsert photos
-        const upsertedIds = photoRepo.upsertMany(candidates);
-        const cleanIds = Array.from(new Set(upsertedIds.filter(Boolean)));
-
-        // Link photos to album
-        const linkedCount = albumRepo.addPhotos(albumId, cleanIds, true) || 0;
-        console.log(`[DEBUG] Candidates fetched:`, candidates.length);
-        console.log(`[DEBUG] Old since_id:`, refresh.since_id);
-        // Update since_id watermark
-        let newSinceId = refresh.since_id;
-        if (candidates.length > 0) {
-            const newestPost = candidates.reduce((newest, post) =>
-                !newest || new Date(post.created_at) > new Date(newest.created_at) ? post : newest, null
-            );
-            if (newestPost) {
-                newSinceId = newestPost.id;
-            }
-        }
-
-        console.log(`[DEBUG] New since_id:`, newSinceId);
-        console.log(`[DEBUG] Newest post ID:`, candidates[0]?.id);
-
-        const updatedRefresh = {
-            ...refresh,
-            last_checked_at: new Date().toISOString(),
-            since_id: newSinceId,
-            backoff_until: null,
-            last_error: null,
-            retry_count: 0
-        }
-
-        console.log(`[DEBUG] Updated refresh object:`, JSON.stringify(updatedRefresh));
-
-        albumRepo.update(albumId, {refresh: updatedRefresh});
-
-        console.log(`[Scheduler] Album ${albumId} refreshed: ${candidates.length} fetched, ${cleanIds.length} upserted, ${linkedCount} linked`);
-        stats.albums_refreshed++;
-    } catch (error) {
-        console.error(`[Scheduler] Error refreshing album ${albumId} "${album.name}":`, error);
-        stats.errors++;
-
-        // Handle rate limiting specially
-        if (error.code === 'rate_limited' || error.message?.includes('429')) {
-            console.log(`[Scheduler] Rate limited on album ${albumId}, applying backoff`);
-            stats.rate_limited++;
-
-            const retryCount = (refresh.retry_count || 0) + 1;
-            const backoffMs = calculateBackoff(retryCount);
-            const backoffUntil = new Date(Date.now() + backoffMs).toISOString();
-
-            const updatedRefresh = {
-                ...refresh,
-                backoff_until: backoffUntil,
-                last_error: error.message,
-                retry_count: retryCount,
-                last_checked_at: new Date().toISOString()
-            };
-
-            albumRepo.update(albumId, { refresh: updatedRefresh });
-        } else {
-            // Other errors - just log for now, will retry next cycle
-            const updatedRefresh = {
-                ...refresh,
-                last_error: error.message,
-                last_checked_at: new Date().toISOString()
-            };
-
-            albumRepo.update(albumId, { refresh: updatedRefresh });
-        }
-    }
 }
 
 /**
@@ -214,7 +109,8 @@ async function schedulerTick(){
 
     try {
         //Get all enabled albums
-        const {items: albums} = albumRepo.list({limit: 1000});
+        const {items: rawAlbums} = albumRepo.list({limit: 1000});
+        const albums = shapeAlbumRows(rawAlbums);
         const dueAlbums = albums.filter(isDueForRefresh);
 
         if (dueAlbums.length === 0) {
@@ -225,7 +121,28 @@ async function schedulerTick(){
         console.log('[Scheduler] Found', dueAlbums.length, 'due albums');
         for (const album of dueAlbums) {
             if (!isRunning) break;
-            await refreshAlbum(album);
+            console.log(`[Scheduler] Refreshing album ${album.id} "${album.name}"`);
+            const result = await albumService.refreshAlbumWithBackoff(
+                album.id,
+                calculateBackoff
+            );
+
+            if (result.success) {
+                console.log(`[Scheduler] ✓ Album ${album.id} refreshed:`, {
+                    fetched: result.fetched,
+                    upserted: result.upserted,
+                    linked: result.linked
+                });
+                stats.albums_refreshed++;
+            } else {
+                console.error(`[Scheduler] ✗ Album ${album.id} refresh failed:`, result.error);
+                stats.errors++;
+
+                if (result.isRateLimited) {
+                    console.log(`[Scheduler] Rate limited, backed off until ${result.backoff_until}`);
+                    stats.rate_limited++;
+                }
+            }
 
             // Delay between refreshes
             await new Promise(resolve => setTimeout(resolve, 1000));
