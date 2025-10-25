@@ -133,7 +133,8 @@ async function refreshAlbum(album) {
 
         // Link photos to album
         const linkedCount = albumRepo.addPhotos(albumId, cleanIds, true) || 0;
-
+        console.log(`[DEBUG] Candidates fetched:`, candidates.length);
+        console.log(`[DEBUG] Old since_id:`, refresh.since_id);
         // Update since_id watermark
         let newSinceId = refresh.since_id;
         if (candidates.length > 0) {
@@ -145,6 +146,9 @@ async function refreshAlbum(album) {
             }
         }
 
+        console.log(`[DEBUG] New since_id:`, newSinceId);
+        console.log(`[DEBUG] Newest post ID:`, candidates[0]?.id);
+
         const updatedRefresh = {
             ...refresh,
             last_checked_at: new Date().toISOString(),
@@ -153,6 +157,8 @@ async function refreshAlbum(album) {
             last_error: null,
             retry_count: 0
         }
+
+        console.log(`[DEBUG] Updated refresh object:`, JSON.stringify(updatedRefresh));
 
         albumRepo.update(albumId, {refresh: updatedRefresh});
 
