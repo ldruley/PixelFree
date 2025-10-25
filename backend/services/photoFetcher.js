@@ -185,8 +185,9 @@ function intersectById(a, b) {
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
 export async function getLatestPhotosForTags(tagsInput, opts = {}) {
-  const limit = clamp(Number(opts.limit) || 20, 1, 40);
-  const tagmode = String(opts.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const limit = clamp(Number(opts?.limit) || 20, 1, 40);
+  const tagmode = String(opts?.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const since_id = opts?.since_id || null;
   const tags = (tagsInput || [])
     .map(s => String(s).replace(/^#/, '').trim())
     .filter(Boolean);
@@ -196,7 +197,7 @@ export async function getLatestPhotosForTags(tagsInput, opts = {}) {
   // Fetch per-tag timelines in parallel
   const headroom = Math.min(limit * 5, 200); // extra for intersection/filter
   const perTagLists = await Promise.all(
-    tags.map(t => fetchTagTimeline(t, { limit: headroom }))
+    tags.map(t => fetchTagTimeline(t, { limit: headroom, since_id }))
   );
 
   // Union candidates by status id (so duplicates collapse)
@@ -219,11 +220,13 @@ export async function getLatestPhotosForUsers(accountIds, opts) {
   const token = await getAccessToken();
   const limit = clamp(Number(opts?.limit)||20, 1, 40);
   const per = clamp(Math.ceil(limit * 1.5), 10, 40);
-
+  const since_id = opts?.since_id || null;
   const all = [];
   for (const id of accountIds) {
     const { data } = await apiGet(`/api/v1/accounts/${encodeURIComponent(id)}/statuses`, token, {
-      limit: per, exclude_replies: true
+        limit: per,
+        exclude_replies: true,
+        since_id,
     });
     if (Array.isArray(data)) {
       for (const st of data) all.push(...statusToPhotos(st));
@@ -234,24 +237,25 @@ export async function getLatestPhotosForUsers(accountIds, opts) {
 }
 
 export async function getLatestPhotosCompound(input, opts = {}) {
-  const limit = clamp(Number(opts.limit) || 20, 1, 40);
-  const tagmode = String(opts.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const limit = clamp(Number(opts?.limit) || 20, 1, 40);
+  const tagmode = String(opts?.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const since_id = opts?.since_id || null;
   const tags = (input.tags || [])
     .map(s => String(s).replace(/^#/, '').trim())
     .filter(Boolean);
   const users = (input.accountIds || []).filter(Boolean);
 
   if (tags.length && !users.length) {
-    return getLatestPhotosForTags(tags, { limit, tagmode });
+    return getLatestPhotosForTags(tags, { limit, tagmode, since_id });
   }
   if (users.length && !tags.length) {
-    return getLatestPhotosForUsers(users, { limit });
+    return getLatestPhotosForUsers(users, { limit, since_id });
   }
 
   // AND semantics in federated context:
   // Fetch user posts, then filter locally by tags (ANY or ALL).
   const headroom = Math.min(limit * 3, 120);
-  const userPosts = await getLatestPhotosForUsers(users, { limit: headroom });
+  const userPosts = await getLatestPhotosForUsers(users, { limit: headroom, since_id });
 
   const filtered = userPosts.filter(p =>
     tagmode === 'all'

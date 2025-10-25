@@ -35,7 +35,7 @@ let settings = {
   redirectUri: process.env.PIXELFED_REDIRECT_URI || 'http://localhost:3000/api/callback',
   display: { transitionMs: 5000, showCaptions: true },
   source: { type: 'tag', tag: 'vacation' },
-  sync: { intervalMs: 300000, fetchLimit: 20, cacheBudgetBytes: 500 * 1024 * 1024 }
+  sync: { intervalMs: 600000, fetchLimit: 20, cacheBudgetBytes: 500 * 1024 * 1024 }
 };
 
 export function getSettings() {
