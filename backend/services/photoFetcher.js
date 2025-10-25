@@ -185,9 +185,9 @@ function intersectById(a, b) {
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
 export async function getLatestPhotosForTags(tagsInput, opts = {}) {
-  const limit = clamp(Number(opts.limit) || 20, 1, 40);
-  const tagmode = String(opts.tagmode || 'any').toLowerCase(); // 'any' | 'all'
-  const since_id = opts.since_id || null;
+  const limit = clamp(Number(opts?.limit) || 20, 1, 40);
+  const tagmode = String(opts?.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const since_id = opts?.since_id || null;
   const tags = (tagsInput || [])
     .map(s => String(s).replace(/^#/, '').trim())
     .filter(Boolean);
@@ -220,7 +220,7 @@ export async function getLatestPhotosForUsers(accountIds, opts) {
   const token = await getAccessToken();
   const limit = clamp(Number(opts?.limit)||20, 1, 40);
   const per = clamp(Math.ceil(limit * 1.5), 10, 40);
-  const since_id = opts.since_id || null;
+  const since_id = opts?.since_id || null;
   const all = [];
   for (const id of accountIds) {
     const { data } = await apiGet(`/api/v1/accounts/${encodeURIComponent(id)}/statuses`, token, {
@@ -237,9 +237,9 @@ export async function getLatestPhotosForUsers(accountIds, opts) {
 }
 
 export async function getLatestPhotosCompound(input, opts = {}) {
-  const limit = clamp(Number(opts.limit) || 20, 1, 40);
-  const tagmode = String(opts.tagmode || 'any').toLowerCase(); // 'any' | 'all'
-  const since_id = opts.since_id || null;
+  const limit = clamp(Number(opts?.limit) || 20, 1, 40);
+  const tagmode = String(opts?.tagmode || 'any').toLowerCase(); // 'any' | 'all'
+  const since_id = opts?.since_id || null;
   const tags = (input.tags || [])
     .map(s => String(s).replace(/^#/, '').trim())
     .filter(Boolean);
