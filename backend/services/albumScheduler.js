@@ -132,7 +132,7 @@ async function refreshAlbum(album) {
         const cleanIds = Array.from(new Set(upsertedIds.filter(Boolean)));
 
         // Link photos to album
-        const linkedCount = albumRepo.addPhotos(albumId, cleanIds) || 0;
+        const linkedCount = albumRepo.addPhotos(albumId, cleanIds, true) || 0;
 
         // Update since_id watermark
         let newSinceId = refresh.since_id;
@@ -181,7 +181,7 @@ async function refreshAlbum(album) {
 
             albumRepo.update(albumId, { refresh: updatedRefresh });
         } else {
-            // Other errors - just log, will retry next cycle
+            // Other errors - just log for now, will retry next cycle
             const updatedRefresh = {
                 ...refresh,
                 last_error: error.message,
