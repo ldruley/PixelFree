@@ -136,7 +136,230 @@ export default function mountFavoritesRoutes(app) {
             });
         }
     })
+// POST /api/favorites/batch/check
+    // Check favorite status for multiple photos
+    router.post('/batch/check', (req, res) => {
+        try {
+            const { statusIds } = req.body;
 
+            if (!Array.isArray(statusIds)) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'statusIds must be an array'
+                    }
+                });
+            }
+
+            if (statusIds.length === 0) {
+                return res.json({ favorites: {} });
+            }
+
+            if (statusIds.length > 100) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'Cannot check more than 100 items at once'
+                    }
+                });
+            }
+
+            const statusMap = favoritesRepo.checkFavoritesStatus(statusIds);
+            console.log(`[Favorites] Checked ${statusIds.length} favorites`);
+
+            res.json({ favorites: statusMap });
+        } catch (error) {
+            console.error('Batch check favorites failed:', error);
+            res.status(500).json({
+                error: {
+                    code: 'InternalError',
+                    message: 'Failed to check favorites'
+                }
+            });
+        }
+    });
+
+    // POST /api/favorites/batch/get
+    // Get favorite metadata for multiple photos
+    router.post('/batch/get', (req, res) => {
+        try {
+            const { statusIds } = req.body;
+
+            if (!Array.isArray(statusIds)) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'statusIds must be an array'
+                    }
+                });
+            }
+
+            if (statusIds.length === 0) {
+                return res.json({ favorites: [] });
+            }
+
+            if (statusIds.length > 100) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'Cannot get more than 100 items at once'
+                    }
+                });
+            }
+
+            const favorites = favoritesRepo.getFavorites(statusIds);
+            console.log(`[Favorites] Retrieved ${favorites.length} favorites`);
+
+            res.json({
+                favorites: favorites.map(f => ({
+                    statusId: f.status_id,
+                    favorited_at: f.favorited_at,
+                    note: f.note,
+                    is_favorited: true
+                }))
+            });
+        } catch (error) {
+            console.error('Batch get favorites failed:', error);
+            res.status(500).json({
+                error: {
+                    code: 'InternalError',
+                    message: 'Failed to get favorites'
+                }
+            });
+        }
+    });
+
+    // POST /api/favorites/batch/add
+    // Add multiple photos to favorites
+    router.post('/batch/add', (req, res) => {
+        try {
+            const { items } = req.body;
+
+            if (!Array.isArray(items)) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'items must be an array'
+                    }
+                });
+            }
+
+            if (items.length === 0) {
+                return res.json({ results: [] });
+            }
+
+            if (items.length > 50) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'Cannot add more than 50 items at once'
+                    }
+                });
+            }
+
+            // Validate all items have statusId
+            for (const item of items) {
+                if (!item.statusId) {
+                    return res.status(400).json({
+                        error: {
+                            code: 'BadRequest',
+                            message: 'Each item must have a statusId'
+                        }
+                    });
+                }
+            }
+
+            // Check if all photos exist
+            const statusIds = items.map(item => item.statusId);
+            const photos = photoRepo.getMany(statusIds);
+            const photoIds = new Set(photos.map(p => p.status_id));
+
+            const results = [];
+            const validItems = [];
+
+            for (const item of items) {
+                if (!photoIds.has(item.statusId)) {
+                    results.push({
+                        statusId: item.statusId,
+                        success: false,
+                        error: 'Photo not found'
+                    });
+                } else {
+                    validItems.push(item);
+                }
+            }
+
+            if (validItems.length > 0) {
+                const addResults = favoritesRepo.addFavorites(validItems);
+                results.push(...addResults.map(r => ({
+                    statusId: r.statusId,
+                    favorited_at: r.favorited_at,
+                    note: r.note,
+                    success: r.success,
+                    error: r.error,
+                    is_favorited: r.success
+                })));
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            console.log(`[Favorites] Batch added ${successCount}/${items.length} favorites`);
+
+            res.status(201).json({ results });
+        } catch (error) {
+            console.error('Batch add favorites failed:', error);
+            res.status(500).json({
+                error: {
+                    code: 'InternalError',
+                    message: 'Failed to add favorites'
+                }
+            });
+        }
+    });
+
+    // POST /api/favorites/batch/remove
+    // Remove multiple photos from favorites
+    router.post('/batch/remove', (req, res) => {
+        try {
+            const { statusIds } = req.body;
+
+            if (!Array.isArray(statusIds)) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'statusIds must be an array'
+                    }
+                });
+            }
+
+            if (statusIds.length === 0) {
+                return res.json({ results: [] });
+            }
+
+            if (statusIds.length > 50) {
+                return res.status(400).json({
+                    error: {
+                        code: 'BadRequest',
+                        message: 'Cannot remove more than 50 items at once'
+                    }
+                });
+            }
+
+            const results = favoritesRepo.removeFavorites(statusIds);
+            const successCount = results.filter(r => r.success).length;
+
+            console.log(`[Favorites] Batch removed ${successCount}/${statusIds.length} favorites`);
+
+            res.json({ results });
+        } catch (error) {
+            console.error('Batch remove favorites failed:', error);
+            res.status(500).json({
+                error: {
+                    code: 'InternalError',
+                    message: 'Failed to remove favorites'
+                }
+            });
+        }
+    });
     // GET /api/favorites
     // List all favorited photos
     router.get('/', (req, res) => {
