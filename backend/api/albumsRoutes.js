@@ -331,12 +331,12 @@ export default function mountAlbumRoutes(app) {
   });
 
   router.post('/:id/photos/:statusId/hide', ensureAuthed, (req, res) => {
-      const {id: albumId, statusId} = req.params;
+      const { id: albumId, statusId } = req.params;
 
       // Verify album exists
       const album = albumRepo.get(albumId);
       if (!album) {
-          throw new NotFoundError(`Album not found`, {albumid});
+          throw new NotFoundError(`Album not found`, {albumId});
       }
 
       // Hide photos
@@ -355,7 +355,7 @@ export default function mountAlbumRoutes(app) {
   });
 
   router.post('/:id/photos/:statusId/unhide', ensureAuthed, (req, res) => {
-        const {id: albumId, statusId} = req.params;
+        const { id: albumId, statusId } = req.params;
 
         // Verify album exists
         const album = albumRepo.get(albumId);
@@ -383,7 +383,7 @@ export default function mountAlbumRoutes(app) {
         const { statusIds } = req.body;
 
         // Validate status ids
-        if(!Array.isArray(statusIds) || statusIds.length === 0) {
+        if (!Array.isArray(statusIds) || statusIds.length === 0) {
             throw new ValidationError('statusIds array is required in request body');
         }
 
