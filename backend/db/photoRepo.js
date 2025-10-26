@@ -99,9 +99,9 @@ export function listForAlbum(albumId, { offset = 0, limit = 20, includeHidden = 
     LIMIT ? OFFSET ?`).all(albumId, limit, offset);
 
     const total = db.prepare(`
-    SELECT COUNT(*) as c 
-    FROM album_items 
-    WHERE album_id = ?
+    SELECT COUNT(*) as c
+    FROM album_items ai
+    WHERE ai.album_id = ?
     ${hiddenClause}
   `).get(albumId).c;
 
