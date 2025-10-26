@@ -9,6 +9,7 @@ import * as photoRepo from '../db/photoRepo.js';
 import * as albumService from '../services/albumService.js';
 import { ensureAuthed } from '../utils/authMiddleware.js';
 import { mapPhotoRow } from "../utils/helpers.js";
+import { ValidationError, NotFoundError } from '../modules/errors.js';
 
 export default function mountAlbumRoutes(app) {
   const router = express.Router();
@@ -310,12 +311,14 @@ export default function mountAlbumRoutes(app) {
       const offset = clamp(Number(req.query.offset ?? 0), 0, 10_000_000);
       const limit = clamp(Number(req.query.limit ?? 20), 1, 100);
 
+      const includeHidden = String(req.query.includeHidden).toLowerCase() === 'true';
+
       const albumRow = albumRepo.get(id);
       if (!albumRow) {
         return res.status(404).json({ error: { code: 'NotFound', message: 'album not found' } });
       }
 
-      const result = photoRepo.listForAlbum(id, { offset, limit }) || {};
+      const result = photoRepo.listForAlbum(id, { offset, limit, includeHidden }) || {};
       const rows   = Array.isArray(result.items) ? result.items : [];
       const total  = Number.isFinite(result.total) ? result.total : rows.length;
 
@@ -326,6 +329,82 @@ export default function mountAlbumRoutes(app) {
       return res.status(500).json({ error: { code: 'InternalError', message: 'failed to list album photos' } });
     }
   });
+
+  router.post('/:id/photos/hide', ensureAuthed, (req, res) => {
+      const {id: albumId, statusId} = req.params;
+
+      // Verify album exists
+      const album = albumRepo.get(albumId);
+      if (!album) {
+          throw new NotFoundError(`Album not found`, {albumid});
+      }
+
+      // Hide photos
+      const hidden = albumRepo.hidePhoto(albumId, statusId);
+      if (!hidden) {
+          throw new NotFoundError(`Photo not found in album`, {albumId, statusId});
+      }
+
+      console.log(`[API] Hidden photo ${statusId} in album ${albumId}`);
+      res.json({
+          success: true,
+          albumId,
+          statusId,
+          hidden: true
+      });
+  });
+
+  router.post('/:id/photos/unhide', ensureAuthed, (req, res) => {
+        const {id: albumId, statusId} = req.params;
+
+        // Verify album exists
+        const album = albumRepo.get(albumId);
+        if (!album) {
+            throw new NotFoundError(`Album not found`, {albumId});
+        }
+
+        // Unhide photos
+        const unhidden = albumRepo.unhidePhoto(albumId, statusId);
+        if (!unhidden) {
+            throw new NotFoundError(`Photo not found in album`, {albumId, statusId});
+        }
+
+        console.log(`[API] Unhidden photo ${statusId} in album ${albumId}`);
+        res.json({
+            success: true,
+            albumId,
+            statusId,
+            hidden: false
+        });
+  })
+
+    router.post('/:id/photos/hide-batch', ensureAuthed, (req, res) => {
+        const { id: albumId } = req.params;
+        const { statusIds } = req.body;
+
+        // Validate status ids
+        if(!Array.isArray(statusIds) || statusIds.length === 0) {
+            throw new ValidationError('statusIds array is required in request body');
+        }
+
+        // Verify album exists
+        const album = albumRepo.get(albumId);
+        if (!album) {
+            throw new NotFoundError(`Album not found`, { albumId });
+        }
+
+        // Hide photos
+        const hiddenCount = albumRepo.hidePhotos(albumId, statusIds);
+
+        console.log(`[API] Hidden ${hiddenCount} photos in album ${albumId}`);
+        res.json({
+            success: true,
+            albumId,
+            requested: statusIds.length,
+            hiddenCount
+        });
+    })
+
 
   // Mount under /api/albums
   app.use('/api/albums', router);
