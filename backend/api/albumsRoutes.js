@@ -330,7 +330,7 @@ export default function mountAlbumRoutes(app) {
     }
   });
 
-  router.post('/:id/photos/hide', ensureAuthed, (req, res) => {
+  router.post('/:id/photos/:statusId/hide', ensureAuthed, (req, res) => {
       const {id: albumId, statusId} = req.params;
 
       // Verify album exists
@@ -354,7 +354,7 @@ export default function mountAlbumRoutes(app) {
       });
   });
 
-  router.post('/:id/photos/unhide', ensureAuthed, (req, res) => {
+  router.post('/:id/photos/:statusId/unhide', ensureAuthed, (req, res) => {
         const {id: albumId, statusId} = req.params;
 
         // Verify album exists
@@ -376,7 +376,7 @@ export default function mountAlbumRoutes(app) {
             statusId,
             hidden: false
         });
-  })
+  });
 
     router.post('/:id/photos/hide-batch', ensureAuthed, (req, res) => {
         const { id: albumId } = req.params;
@@ -403,7 +403,7 @@ export default function mountAlbumRoutes(app) {
             requested: statusIds.length,
             hiddenCount
         });
-    })
+    });
 
 
   // Mount under /api/albums
