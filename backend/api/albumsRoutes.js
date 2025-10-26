@@ -10,6 +10,7 @@ import * as albumService from '../services/albumService.js';
 import { ensureAuthed } from '../utils/authMiddleware.js';
 import { mapPhotoRow } from "../utils/helpers.js";
 import { ValidationError, NotFoundError } from '../modules/errors.js';
+import {asyncHandler} from "../utils/errorMapper.js";
 
 export default function mountAlbumRoutes(app) {
   const router = express.Router();
@@ -330,7 +331,7 @@ export default function mountAlbumRoutes(app) {
     }
   });
 
-  router.post('/:id/photos/:statusId/hide', ensureAuthed, (req, res) => {
+  router.post('/:id/photos/:statusId/hide', ensureAuthed, asyncHandler(async (req, res) => {
       const { id: albumId, statusId } = req.params;
 
       // Verify album exists
@@ -352,9 +353,9 @@ export default function mountAlbumRoutes(app) {
           statusId,
           hidden: true
       });
-  });
+  }));
 
-  router.post('/:id/photos/:statusId/unhide', ensureAuthed, (req, res) => {
+  router.post('/:id/photos/:statusId/unhide', ensureAuthed, asyncHandler(async (req, res) => {
         const { id: albumId, statusId } = req.params;
 
         // Verify album exists
@@ -376,9 +377,9 @@ export default function mountAlbumRoutes(app) {
             statusId,
             hidden: false
         });
-  });
+  }));
 
-    router.post('/:id/photos/hide-batch', ensureAuthed, (req, res) => {
+    router.post('/:id/photos/hide-batch', ensureAuthed, asyncHandler(async (req, res) => {
         const { id: albumId } = req.params;
         const { statusIds } = req.body;
 
@@ -403,7 +404,7 @@ export default function mountAlbumRoutes(app) {
             requested: statusIds.length,
             hiddenCount
         });
-    });
+    }));
 
 
   // Mount under /api/albums
