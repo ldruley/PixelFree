@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS album_items (
   album_id    TEXT NOT NULL,
   status_id   TEXT NOT NULL,
   added_at    TEXT NOT NULL,
+  hidden      INTEGER NOT NULL DEFAULT 0,  -- 0=visible, 1=hidden
   PRIMARY KEY (album_id, status_id),
   FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
   FOREIGN KEY (status_id) REFERENCES photos(status_id) ON DELETE CASCADE
