@@ -125,3 +125,59 @@ export function listItems(albumId, { offset = 0, limit = 20 } = {}) {
   const total = db.prepare('SELECT COUNT(*) as c FROM album_items WHERE album_id=?').get(albumId).c;
   return { items: rows.map(r => r.status_id), total, offset, limit };
 }
+
+/**
+ * Hide a photo from an album
+ * @param {string} albumId
+ * @param {string} statusId
+ * @returns {boolean} True if item was hidden, false if not found
+ */
+export function hidePhoto(albumId, statusId) {
+    const info = db.prepare(`
+        UPDATE album_items 
+        SET hidden=1 
+        WHERE album_id=? AND status_id=?`).run(albumId, statusId);
+    return info.changes > 0;
+}
+
+/**
+ * Unhide a photo in an album
+ * @param {string} albumId
+ * @param {string} statusId
+ * @returns {boolean}
+ */
+export function unhidePhoto(albumId, statusId) {
+    const info = db.prepare(`
+        UPDATE album_items 
+        SET hidden=0 
+        WHERE album_id=? AND status_id=?`).run(albumId, statusId);
+    return info.changes > 0;
+}
+
+/**
+ * Hide multiple photos in an album
+ * @param {string} albumId
+ * @param {string[]} statusIds
+ * @returns {number} Number of items hidden
+ */
+export function hidePhotos(albumId, statusIds) {
+    if (!Array.isArray(statusIds) || statusIds.length === 0) {
+        return 0;
+    }
+
+    const tx = db.transaction((ids) => {
+        let hiddenCount = 0;
+        const stmt = db.prepare(`
+            UPDATE album_items
+            SET hidden=1
+            WHERE album_id = ?
+              AND status_id = ?
+        `);
+        for (const sid of ids) {
+            const info = stmt.run(albumId, sid);
+            hiddenCount += info.changes;
+        }
+        return hiddenCount;
+    });
+    return tx(statusIds);
+}
