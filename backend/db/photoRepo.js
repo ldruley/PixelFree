@@ -78,15 +78,33 @@ export function getMany(statusIds) {
            .all(...statusIds);
 }
 
-export function listForAlbum(albumId, { offset = 0, limit = 20 } = {}) {
-  const rows = db.prepare(`
+/**
+ * List photos for a given album
+ * @param {string} albumId
+ * @param {object} options
+ * @param {number} options.offset
+ * @param {number} options.limit
+ * @param {boolean} options.includeHidden - if false, filters out hidden photos
+ * @returns {{items: Array, total: number, offset: number, limit: number}}
+ */
+export function listForAlbum(albumId, { offset = 0, limit = 20, includeHidden = false } = {}) {
+    const hiddenClause = includeHidden ? '' : 'AND ai.hidden = 0';
+
+    const rows = db.prepare(`
     SELECT p.* FROM album_items ai
     JOIN photos p ON p.status_id = ai.status_id
     WHERE ai.album_id = ?
+    ${hiddenClause}
     ORDER BY ai.added_at DESC
     LIMIT ? OFFSET ?`).all(albumId, limit, offset);
 
-  const total = db.prepare('SELECT COUNT(*) as c FROM album_items WHERE album_id=?').get(albumId).c;
+    const total = db.prepare(`
+    SELECT COUNT(*) as c 
+    FROM album_items 
+    WHERE album_id = ?
+    ${hiddenClause}
+  `).get(albumId).c;
+
   return { items: rows, total, offset, limit };
 }
 
