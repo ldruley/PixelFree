@@ -181,3 +181,53 @@ export function hidePhotos(albumId, statusIds) {
     });
     return tx(statusIds);
 }
+
+/**
+ * Get photos from multiple albums with optional merging strategies.
+ * @param {string[]} albumIds - Array of album IDs to fetch from
+ * @param {object} options - Query options
+ * @param {number} options.limit - Maximum photos to return
+ * @param {number} options.offset - Offset for pagination
+ * @param {boolean} options.includeHidden - Include hidden photos
+ * @returns {{ photos: Array, albumInfo: Array }}
+ */
+export function getPhotosFromMultipleAlbums(albumIds, { limit = 40, offset = 0, includeHidden = false } = {}) {
+    if (!Array.isArray(albumIds) || albumIds.length === 0) {
+        return { photos: [], albumInfo: [] };
+    }
+
+    // Get album metadata
+    const placeholders = albumIds.map(() => '?').join(',');
+    const albumRows = db.prepare(`
+        SELECT id, name, enabled FROM albums 
+        WHERE id IN (${placeholders})
+    `).all(...albumIds);
+
+    // Build WHERE clause for photos
+    const whereConditions = ['ai.album_id IN (' + placeholders + ')'];
+    const params = [...albumIds];
+
+    if (!includeHidden) {
+        whereConditions.push('ai.hidden = 0');
+    }
+
+    const whereSql = `WHERE ${whereConditions.join(' AND ')}`;
+
+    // Fetch photos with album association
+    const photos = db.prepare(`
+        SELECT 
+            p.*,
+            ai.album_id,
+            ai.added_at
+        FROM album_items ai
+        JOIN photos p ON p.status_id = ai.status_id
+        ${whereSql}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+
+    return {
+        photos: photos || [],
+        albumInfo: albumRows || []
+    };
+}
