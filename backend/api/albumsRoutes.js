@@ -406,6 +406,89 @@ export default function mountAlbumRoutes(app) {
         });
     }));
 
+    // GET /api/albums/merged/photos?ids=alb1,alb2&limit=40&strategy=round-robin
+    // TODO: consider reasonable limit values for this use case
+    router.get('/merged/photos', asyncHandler(async (req, res) => {
+        // Parse and validate album IDs
+        const idsParam = req.query.ids;
+        if (!idsParam || typeof idsParam !== 'string') {
+            throw new ValidationError('ids parameter is required', { provided: idsParam });
+        }
+
+        const albumIds = idsParam.split(',')
+            .map(id => id.trim())
+            .filter(Boolean);
+
+        if (albumIds.length === 0) {
+            throw new ValidationError('At least one album ID is required', { ids: idsParam });
+        }
+
+        if (albumIds.length > 10) {
+            throw new ValidationError('Maximum 10 albums per request', {
+                provided: albumIds.length,
+                maximum: 10
+            });
+        }
+
+        const offset = clamp(Number(req.query.offset ?? 0), 0, 10_000_000);
+        const limit = clamp(Number(req.query.limit ?? 20), 1, 200);
+
+        // Validate strategy
+        const validStrategies = ['chronological', 'round-robin', 'random'];
+        const strategy = req.query.strategy || 'chronological';
+        if (!validStrategies.includes(strategy)) {
+            throw new ValidationError('Invalid strategy', {
+                provided: strategy,
+                allowed: validStrategies
+            });
+        }
+        const showHidden = String(req.query.includeHidden).toLowerCase() === 'true';
+
+        // Fetch from Database
+        const headroom = Math.min(limit * 2, 400);
+        const { photos, albumInfo } = albumRepo.getPhotosFromMultipleAlbums(albumIds, {
+            limit: headroom,
+            offset,
+            includeHidden: showHidden
+        });
+
+        // Verify albums found
+        if (albumInfo.length === 0) {
+            throw new NotFoundError('No albums found', { ids: albumIds });
+        }
+
+        // TODO: consider making this a warning instead of an error
+        const foundIds = new Set(albumInfo.map(a => a.id));
+        const missingIds = albumIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+            throw new NotFoundError('Some albums not found', {
+                missing: missingIds,
+                found: Array.from(foundIds)
+            });
+        }
+
+        // Apply Strategy
+        let result;
+        if (strategy === 'chronological') {
+            result = albumService.dedupeByStatusId(photos).slice(0, limit);
+        } else if (strategy === 'round-robin') {
+            result = albumService.roundRobinMerge(photos, albumIds, limit);
+        } else if (strategy === 'random') {
+            result = albumService.shuffleArray(albumService.dedupeByStatusId(photos)).slice(0, limit);
+        }
+
+        // Format Response
+        const items = result.map(mapPhotoRow);
+
+        res.json({
+            items,
+            total: photos.length,
+            returned: items.length,
+            offset,
+            limit,
+            strategy
+        });
+    }));
 
   // Mount under /api/albums
   app.use('/api/albums', router);
