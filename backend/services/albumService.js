@@ -393,3 +393,80 @@ export function getAlbumRefreshStatus(albumId) {
         retryCount: refresh.retry_count || 0
     };
 }
+
+/**
+ * Deduplicate photos by status_id (keep first occurrence)
+ * @param {Array} photos - Array of photo objects with status_id
+ * @returns {Array} - Deduplicated array of photos
+ */
+export function dedupeByStatusId(photos) {
+    const seen = new Set();
+    return photos.filter(p => {
+        if (seen.has(p.status_id)) return false;
+        seen.add(p.status_id);
+        return true;
+    });
+}
+
+/**
+ * Round-robin merge: take one photo from each album in rotation
+ * @param {Array} photos - Array of photo objects with album_id
+ * @param {Array} albumIds - Ordered array of album IDs
+ * @param {number} limit - Maximum number of photos to return
+ * @returns {Array} - Merged array of photos
+ */
+export function roundRobinMerge(photos, albumIds, limit) {
+    // Group photos by album
+    const byAlbum = {};
+    albumIds.forEach(id => byAlbum[id] = []);
+
+    photos.forEach(p => {
+        if (byAlbum[p.album_id]) {
+            byAlbum[p.album_id].push(p);
+        }
+    });
+
+    // Round-robin selection
+    const result = [];
+    const seen = new Set();
+    let round = 0;
+
+    while (result.length < limit) {
+        let addedThisRound = false;
+
+        for (const albumId of albumIds) {
+            if (result.length >= limit) break;
+
+            const albumPhotos = byAlbum[albumId];
+            if (round < albumPhotos.length) {
+                const photo = albumPhotos[round];
+                // Skip if already added (dedupe across albums)
+                if (!seen.has(photo.status_id)) {
+                    result.push(photo);
+                    seen.add(photo.status_id);
+                    addedThisRound = true;
+                }
+            }
+        }
+
+        // If no photos added this round, we're done
+        if (!addedThisRound) break;
+        round++;
+    }
+
+    return result;
+}
+
+/**
+ * Fisher-Yates shuffle
+ * @param {Array} array - Array to shuffle
+ * @returns {Array} - Shuffled array
+ */
+export function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
