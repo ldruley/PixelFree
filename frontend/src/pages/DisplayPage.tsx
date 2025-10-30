@@ -3,7 +3,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { listAlbums, type Album } from '../services/albumService'
 
 const DisplayPage: React.FC = () => {
-  const { settings, updateSettings, resetSettings, isWithinOperatingHours, getTimingInMs } = useSettings()
+  const { settings, updateSettings, resetSettings, isWithinOperatingHours } = useSettings()
   const [albums, setAlbums] = useState<Album[]>([])
   const [loadingAlbums, setLoadingAlbums] = useState(true)
 

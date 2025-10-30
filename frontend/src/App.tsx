@@ -5,6 +5,8 @@ import Header from './components/Header'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import AlbumsPage from './pages/AlbumsPage'
+import AlbumGalleryPage from './pages/AlbumGalleryPage'
+import FavoritesPage from './pages/FavoritesPage'
 import DisplayPage from './pages/DisplayPage'
 import PlayerPage from './pages/PlayerPage'
 
@@ -32,10 +34,26 @@ function App() {
                   <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route 
+                      path="/albums/:id" 
+                      element={
+                        <ProtectedRoute>
+                          <AlbumGalleryPage />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    <Route 
                       path="/albums" 
                       element={
                         <ProtectedRoute>
                           <AlbumsPage />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/favorites" 
+                      element={
+                        <ProtectedRoute>
+                          <FavoritesPage />
                         </ProtectedRoute>
                       } 
                     />

@@ -11,8 +11,6 @@ import {
   refreshAlbum,
 } from '../services/albumService';
 
-const FAVORITES_ALBUM_ID = 'favorites_builtin';
-
 const AlbumsPage: React.FC = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,10 +19,6 @@ const AlbumsPage: React.FC = () => {
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
-
-  // Built-in Favorites album
-  const [favoritesAlbum, setFavoritesAlbum] = useState<Album | null>(null);
-  const [isCreatingFavorites, setIsCreatingFavorites] = useState(false);
 
   // Load albums on mount
   useEffect(() => {
@@ -36,13 +30,7 @@ const AlbumsPage: React.FC = () => {
       setIsLoading(true);
       setError(null);
       const response = await listAlbums({ limit: 100 });
-      
-      // Separate favorites from other albums
-      const favorites = response.items.find(a => a.id === FAVORITES_ALBUM_ID);
-      const regular = response.items.filter(a => a.id !== FAVORITES_ALBUM_ID);
-      
-      setFavoritesAlbum(favorites || null);
-      setAlbums(regular);
+      setAlbums(response.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load albums');
       console.error('Error loading albums:', err);
@@ -133,47 +121,6 @@ const AlbumsPage: React.FC = () => {
     setShowForm(true);
   };
 
-  // Create Favorites album if it doesn't exist
-  const createFavoritesAlbum = async () => {
-    // Prevent duplicate creation
-    if (isCreatingFavorites || favoritesAlbum) {
-      return;
-    }
-
-    try {
-      setIsCreatingFavorites(true);
-      
-      // Double-check that it doesn't exist
-      const response = await listAlbums({ limit: 100 });
-      const existing = response.items.find(a => a.id === FAVORITES_ALBUM_ID);
-      
-      if (existing) {
-        setFavoritesAlbum(existing);
-        return;
-      }
-
-      await createAlbum({
-        id: FAVORITES_ALBUM_ID, // Use the specific ID for favorites
-        name: 'Favorites',
-        query: {
-          type: 'tag',
-          tags: ['favorites'],
-          tagmode: 'any',
-          limit: 40,
-        },
-        refresh: {
-          intervalMs: 600000, // 10 minutes
-        },
-        enabled: true,
-      });
-      await loadAlbums();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create Favorites album');
-    } finally {
-      setIsCreatingFavorites(false);
-    }
-  };
-
   return (
     <div className="page-container">
       {/* Simple Header */}
@@ -196,48 +143,25 @@ const AlbumsPage: React.FC = () => {
         <div className="empty-state">
           Loading albums...
         </div>
+      ) : albums.length > 0 ? (
+        <div className="albums-grid">
+          {albums.map((album) => (
+            <AlbumCard
+              key={album.id}
+              album={album}
+              onEdit={handleEditAlbum}
+              onDelete={handleDeleteAlbum}
+              onToggle={handleToggleAlbum}
+            />
+          ))}
+        </div>
       ) : (
-        <>
-          {/* Favorites */}
-          {favoritesAlbum && (
-            <div className="section-divider">
-              <h2 className="section-header">Favorites</h2>
-              <AlbumCard
-                album={favoritesAlbum}
-                isFavorites={true}
-                onEdit={handleEditAlbum}
-                onDelete={handleDeleteAlbum}
-                onToggle={handleToggleAlbum}
-              />
-            </div>
-          )}
-
-          {/* Your Albums */}
-          {albums.length > 0 && favoritesAlbum && (
-            <h2 className="section-header">Your Albums</h2>
-          )}
-          
-          {albums.length > 0 ? (
-            <div className="albums-grid">
-              {albums.map((album) => (
-                <AlbumCard
-                  key={album.id}
-                  album={album}
-                  onEdit={handleEditAlbum}
-                  onDelete={handleDeleteAlbum}
-                  onToggle={handleToggleAlbum}
-                />
-              ))}
-            </div>
-          ) : !favoritesAlbum ? (
-            <div className="empty-state">
-              <p className="empty-state-message">No albums yet</p>
-              <button className="btn btn-primary" onClick={handleNewAlbum}>
-                Create Album
-              </button>
-            </div>
-          ) : null}
-        </>
+        <div className="empty-state">
+          <p className="empty-state-message">No albums yet</p>
+          <button className="btn btn-primary" onClick={handleNewAlbum}>
+            Create Album
+          </button>
+        </div>
       )}
 
       {/* Album Form Modal */}

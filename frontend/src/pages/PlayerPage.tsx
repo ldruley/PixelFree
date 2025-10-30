@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Photo } from '../services/photoService'
 import { getAlbumPhotos, listAlbums } from '../services/albumService'
+import { addFavorite, removeFavorite, batchCheckFavorites } from '../services/favoritesService'
 import { useSettings } from '../contexts/SettingsContext'
 
 const PlayerPage: React.FC = () => {
@@ -16,13 +17,8 @@ const PlayerPage: React.FC = () => {
   const [isPaused] = useState(false)
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | 'none'>('none')
   const [isTransitioning, setIsTransitioning] = useState(false)
-
-  // Debug: Log settings changes
-  useEffect(() => {
-    console.log('PlayerPage: Settings updated:', settings)
-    console.log('PlayerPage: Layout is:', settings.layout)
-    console.log('PlayerPage: Transition is:', settings.transition)
-  }, [settings])
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({})
+  const [isFavoriting, setIsFavoriting] = useState(false)
 
   // Fisher-Yates shuffle algorithm
   const shuffleArray = (array: number[]): number[] => {
@@ -77,6 +73,13 @@ const PlayerPage: React.FC = () => {
         const shuffled = shuffleArray(indices)
         setShuffledIndices(shuffled)
         setCurrentIndex(0)
+
+        // Batch check favorite status for all photos
+        if (photosResponse.items.length > 0) {
+          const statusIds = photosResponse.items.map(p => p.id)
+          const favStatus = await batchCheckFavorites(statusIds)
+          setFavorites(favStatus)
+        }
       } catch (err) {
         setError('Failed to load photos from album')
         console.error('Error loading photos:', err)
@@ -129,7 +132,6 @@ const PlayerPage: React.FC = () => {
 
     const interval = setInterval(() => {
       if (settings.transition === 'slide') {
-        console.log('Starting slide transition')
         setSlideDirection('left')
         setIsTransitioning(true)
         setTimeout(() => {
@@ -180,10 +182,8 @@ const PlayerPage: React.FC = () => {
 
   // Handle exit to main page
   const handleExit = useCallback(() => {
-    console.log('Exit button clicked!')
     try {
       navigate('/')
-      console.log('Navigation called')
     } catch (error) {
       console.error('Navigation error:', error)
       // Fallback to window location
@@ -196,7 +196,6 @@ const PlayerPage: React.FC = () => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.code === 'Escape') {
         event.preventDefault()
-        console.log('ESC key pressed - exiting')
         handleExit()
       }
     }
@@ -212,6 +211,29 @@ const PlayerPage: React.FC = () => {
     if (photos.length === 0) return null
     const photoIndex = settings.order === 'shuffle' ? shuffledIndices[currentIndex] : currentIndex
     return photos[photoIndex] || null
+  }
+
+  // Handle toggle favorite for current photo
+  const handleToggleFavorite = async () => {
+    const currentPhoto = getCurrentPhoto()
+    if (!currentPhoto || isFavoriting) return
+
+    const isFavorited = favorites[currentPhoto.id]
+    
+    try {
+      setIsFavoriting(true)
+      if (isFavorited) {
+        await removeFavorite(currentPhoto.id)
+        setFavorites(prev => ({ ...prev, [currentPhoto.id]: false }))
+      } else {
+        await addFavorite(currentPhoto.id)
+        setFavorites(prev => ({ ...prev, [currentPhoto.id]: true }))
+      }
+    } catch (err) {
+      console.error('Failed to update favorite:', err)
+    } finally {
+      setIsFavoriting(false)
+    }
   }
 
   // Check if we're outside operating hours
@@ -309,10 +331,21 @@ const PlayerPage: React.FC = () => {
         )}
       </div>
 
-      {/* Simple overlay with exit button - always visible */}
+      {/* Simple overlay with exit button and favorites - always visible */}
       <div className="absolute inset-0 pointer-events-none">
-        {/* Top bar with exit button - always clickable */}
-        <div className="absolute top-0 right-0 p-6 pointer-events-auto">
+        {/* Top bar with controls - always clickable */}
+        <div className="absolute top-0 left-0 right-0 p-6 flex justify-between pointer-events-auto">
+          <button
+            onClick={handleToggleFavorite}
+            disabled={isFavoriting}
+            className={`px-6 py-3 rounded-lg transition-all font-medium shadow-lg ${
+              favorites[getCurrentPhoto()?.id || '']
+                ? 'bg-red-500/90 hover:bg-red-500 text-white'
+                : 'bg-white/90 hover:bg-white text-gray-700'
+            } ${showControls ? 'opacity-100' : 'opacity-70'} ${isFavoriting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {favorites[getCurrentPhoto()?.id || ''] ? '♥ Favorited' : '♡ Favorite'}
+          </button>
           <button
             onClick={handleExit}
             className={`px-6 py-3 bg-red-600/90 hover:bg-red-600 rounded-lg transition-all text-white font-medium shadow-lg ${
@@ -336,15 +369,6 @@ const PlayerPage: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* Debug: Show current settings state */}
-        <div className="absolute top-0 left-0 p-4 bg-red-500/80 text-white text-xs">
-          <div>Layout: {settings.layout}</div>
-          <div>Transition: {settings.transition}</div>
-          <div>Photos: {displayPhotos.length}</div>
-          <div>Transitioning: {isTransitioning ? 'YES' : 'NO'}</div>
-          <div>Direction: {slideDirection}</div>
-        </div>
       </div>
     </div>
   )

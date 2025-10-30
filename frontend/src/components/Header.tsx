@@ -39,6 +39,12 @@ const Header: React.FC = () => {
                 Albums
               </Link>
               <Link 
+                to="/favorites" 
+                className={`nav-link ${isActive('/favorites') ? 'active' : ''}`}
+              >
+                Favorites
+              </Link>
+              <Link 
                 to="/display" 
                 className={`nav-link ${isActive('/display') ? 'active' : ''}`}
               >
