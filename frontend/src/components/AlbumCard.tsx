@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Album } from '../services/albumService';
 import { getAlbumPhotos, refreshAlbum } from '../services/albumService';
 import type { Photo } from '../services/photoService';
 
 interface AlbumCardProps {
   album: Album;
-  isFavorites?: boolean;
   onEdit: (album: Album) => void;
   onDelete: (album: Album) => void;
   onToggle: (album: Album, enabled: boolean) => void;
@@ -13,11 +13,11 @@ interface AlbumCardProps {
 
 const AlbumCard: React.FC<AlbumCardProps> = ({ 
   album, 
-  isFavorites = false, 
   onEdit, 
   onDelete,
   onToggle 
 }) => {
+  const navigate = useNavigate();
   const [previewPhotos, setPreviewPhotos] = useState<Photo[]>([]);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -97,12 +97,15 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
     return parts.join(' • ') || 'No query defined';
   };
 
+  const handleCardClick = () => {
+    navigate(`/albums/${album.id}`);
+  };
+
   return (
-    <div className="album-card">
+    <div className="album-card" onClick={handleCardClick}>
       <div className="album-card-header">
         <div className="album-info">
           <h3 className="album-name">
-            {isFavorites && <span className="favorites-icon">[*]</span>}
             {album.name}
           </h3>
           <p className="album-query">{getQueryDescription()}</p>
@@ -113,7 +116,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             )}
           </p>
         </div>
-        <div className="album-actions">
+        <div className="album-actions" onClick={(e) => e.stopPropagation()}>
           <label className="toggle-switch">
             <input
               type="checkbox"
@@ -146,7 +149,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="album-card-footer">
+      <div className="album-card-footer" onClick={(e) => e.stopPropagation()}>
         <button
           className="btn btn-secondary"
           onClick={handleRefresh}
@@ -160,14 +163,12 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         >
           Edit
         </button>
-        {!isFavorites && (
-          <button
-            className="btn btn-danger"
-            onClick={() => onDelete(album)}
-          >
-            Delete
-          </button>
-        )}
+        <button
+          className="btn btn-danger"
+          onClick={() => onDelete(album)}
+        >
+          Delete
+        </button>
       </div>
 
       <style>{`
@@ -178,11 +179,16 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
           background: white;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
           transition: transform 0.2s, box-shadow 0.2s;
+          cursor: pointer;
         }
 
         .album-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .album-card:active {
+          transform: translateY(0);
         }
 
         .album-card-header {
@@ -204,10 +210,6 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
           display: flex;
           align-items: center;
           gap: 8px;
-        }
-
-        .favorites-icon {
-          font-size: 1.1rem;
         }
 
         .album-query {
