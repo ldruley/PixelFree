@@ -15,7 +15,6 @@ Unlike commercial frames tied to closed ecosystems, PixelFree gives users full c
 - 👤 User setup and authentication through the web UI
 - 🖼️ Album management (tags, users, filters)
 - ⚙️ Display configuration (layout, transitions, timing)
-- 🧭 Real-time photo display in full-screen mode
 
 ---
 
@@ -24,9 +23,8 @@ Unlike commercial frames tied to closed ecosystems, PixelFree gives users full c
 | Component | Description | Technology |
 |------------|--------------|-------------|
 | **Settings UI** | Configuration and settings interface (setup, styling, preferences, theme selection) | React + JavaScript (Vite), Tailwind |
-| **Display UI** | Full-screen photo carousel running on the frame (layouts & transitions) | React + JavaScript, Tailwind |
 
-Both frontend layers communicate with backend APIs to fetch photos, manage authentication, and update display settings dynamically.
+Frontend communicates with backend APIs to fetch photos, manage authentication, and update display settings dynamically.
 
 ---
 
