@@ -33,14 +33,14 @@ const Header: React.FC = () => {
           {authStatus.isAuthenticated ? (
             <>
               <Link 
-                to="/display" 
-                className={`nav-link ${isActive('/display') ? 'active' : ''}`}
+                to="/settings"
+                className={`nav-link ${isActive('/settings') ? 'active' : ''}`}
               >
-                Display
+                Settings
               </Link>
               <Link 
-                to="/player" 
-                className={`nav-link ${isActive('/player') ? 'active' : ''}`}
+                to="/"
+                className={`nav-link ${isActive('/') ? 'active' : ''}`}
               >
                 Player
               </Link>

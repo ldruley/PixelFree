@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSettings } from '../contexts/SettingsContext'
 import { listAlbums, type Album } from '../services/albumService'
 
-const DisplayPage: React.FC = () => {
+const SettingsPage: React.FC = () => {
   const { settings, updateSettings, resetSettings, isWithinOperatingHours } = useSettings()
   const [albums, setAlbums] = useState<Album[]>([])
   const [loadingAlbums, setLoadingAlbums] = useState(true)
@@ -264,4 +264,4 @@ const DisplayPage: React.FC = () => {
   )
 }
 
-export default DisplayPage
+export default SettingsPage
