@@ -10,26 +10,22 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Check for authentication success parameter
   useEffect(() => {
     if (searchParams.get('auth') === 'success') {
       setShowSuccess(true)
-      // Remove the auth parameter from URL
       setSearchParams({})
-      // Hide success message after 5 seconds, then redirect
       setTimeout(() => {
         setShowSuccess(false)
         if (authStatus.isAuthenticated) {
-          navigate('/albums')
+          navigate('/')
         }
-      }, 5000)
+      }, 0)
     }
   }, [searchParams, setSearchParams, authStatus.isAuthenticated, navigate])
 
-  // Redirect if already authenticated (but not if showing success message - this will take user to album for more guided flow  )
   useEffect(() => {
     if (authStatus.isAuthenticated && !showSuccess) {
-      navigate('/albums')
+      navigate('/welcome')
     }
   }, [authStatus.isAuthenticated, navigate, showSuccess])
 
@@ -38,8 +34,6 @@ const LoginPage: React.FC = () => {
       setIsLoggingIn(true)
       setError(null)
       await login()
-      // Note: login() will redirect to Pixelfed, so we won't reach this point
-      // unless there's an error
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
       setIsLoggingIn(false)

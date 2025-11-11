@@ -6,48 +6,50 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
 import PlayerPage from './pages/PlayerPage'
+import WelcomePage from './pages/WelcomePage'
 
 function App() {
-  return (
-      <AuthProvider>
-        <SettingsProvider>
-          <Router>
-            <Routes>
-              <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <PlayerPage />
-                    </ProtectedRoute>
-                  }
-              />
-
-              <Route
-                  path="/*"
-                  element={
-                    <div>
-                      <Header />
-                      <main>
-                        <Routes>
-                          <Route path="/login" element={<LoginPage />} />
-                          <Route
-                              path="/settings"
-                              element={
+    return (
+        <AuthProvider>
+            <SettingsProvider>
+                <Router>
+                    <Routes>
+                        <Route path="/welcome" element={<WelcomePage />} />
+                        <Route
+                            path="/"
+                            element={
                                 <ProtectedRoute>
-                                  <SettingsPage />
+                                    <PlayerPage />
                                 </ProtectedRoute>
-                              }
-                          />
-                        </Routes>
-                      </main>
-                    </div>
-                  }
-              />
-            </Routes>
-          </Router>
-        </SettingsProvider>
-      </AuthProvider>
-  )
+                            }
+                        />
+
+                        <Route
+                            path="/*"
+                            element={
+                                <div>
+                                    <Header />
+                                    <main>
+                                        <Routes>
+                                            <Route path="/login" element={<LoginPage />} />
+                                            <Route
+                                                path="/settings"
+                                                element={
+                                                    <ProtectedRoute>
+                                                        <SettingsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                        </Routes>
+                                    </main>
+                                </div>
+                            }
+                        />
+                    </Routes>
+                </Router>
+            </SettingsProvider>
+        </AuthProvider>
+    )
 }
 
 export default App
