@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 
 export interface PlayerSettings {
+  background: 'black'|'blur'|'gradient'
   // Layout settings
   layout: 'single' | 'grid' | 'split'
   
@@ -34,6 +35,7 @@ interface SettingsContextType {
 }
 
 const defaultSettings: PlayerSettings = {
+  background:'gradient',
   layout: 'single',
   transition: 'fade',
   timing: '10s',

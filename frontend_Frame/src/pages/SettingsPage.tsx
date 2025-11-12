@@ -103,7 +103,27 @@ const SettingsPage: React.FC = () => {
               <option value="slide">Slide</option>
             </select>
           </div>
-
+          {/* Background */}
+          <div className="card">
+            <h2 className="card-title">Background</h2>
+            <div className="radio-group">
+              {(['black', 'blur', 'gradient'] as const).map((bg) => (
+                  <label key={bg} className="radio-label">
+                    <input
+                        type="radio"
+                        name="background"
+                        value={bg}
+                        checked={settings.background === bg}
+                        onChange={() => updateSettings({ background: bg })}
+                        className="radio-input"
+                    />
+                    <span className="radio-text">
+          {bg === 'black' ? 'Black' : bg === 'blur' ? 'Blurred Image' : 'Sky Gradient'}
+        </span>
+                  </label>
+              ))}
+            </div>
+          </div>
 
           {/* Timing */}
           <div className="card">

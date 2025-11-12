@@ -4,7 +4,7 @@ import type { Photo } from '../services/photoService'
 import { getAlbumPhotos, listAlbums } from '../services/albumService'
 import { useSettings } from '../contexts/SettingsContext'
 import Header from '../components/Header'
-import '../styles/player.css'  // plain-CSS , tailwind was not working with me
+import '../styles/player.css'
 
 const PlayerPage: React.FC = () => {
   const navigate = useNavigate()
@@ -18,10 +18,9 @@ const PlayerPage: React.FC = () => {
   const hideTimerRef = useRef<number | null>(null)
   const [isAnimating, setIsAnimating] = useState(false)
   const [nextIndex, setNextIndex] = useState<number | null>(null)
-  const [direction] = useState<'left' | 'right'>('left') // slide-in direction , this section is still buggy with the transition
-  const [nextReady, setNextReady] = useState(false)       // preload guard, helped with bugs
+  const [direction] = useState<'left' | 'right'>('left')
+  const [nextReady, setNextReady] = useState(false)
 
-//shuffle func
   const shuffleArray = (array: number[]): number[] => {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -33,7 +32,7 @@ const PlayerPage: React.FC = () => {
 
   const parseTimingMs = (t?: string) => {
     if (!t) return 5000
-    const m = String(t).trim().match(/^(\d+)\s*s?$/i) // "10s" or "10"
+    const m = String(t).trim().match(/^(\d+)\s*s?$/i)
     return m ? Math.max(1000, parseInt(m[1], 10) * 1000) : 5000
   }
   const intervalMs = parseTimingMs(settings?.timing)
@@ -76,7 +75,6 @@ const PlayerPage: React.FC = () => {
     loadPhotos()
   }, [settings.activeAlbum, settings.maxImages])
 
-  // issues with image indexing
   const getResolvedIndex = (idx: number) => {
     if (photos.length === 0) return 0
     return settings.order === 'shuffle'
@@ -89,7 +87,6 @@ const PlayerPage: React.FC = () => {
     return (currentIndex + 1) % photos.length
   }, [currentIndex, photos.length])
 
-  // transition cycles, preparing before hand
   const beginTransition = useCallback(() => {
     if (photos.length === 0 || isAnimating) return
     const ni = computeNextIndex()
@@ -97,7 +94,6 @@ const PlayerPage: React.FC = () => {
     setIsAnimating(false)
   }, [photos.length, isAnimating, computeNextIndex])
 
-  // Preload next image whenever nextIndex changes
   useEffect(() => {
     if (nextIndex == null) { setNextReady(false); return }
     const next = photos[getResolvedIndex(nextIndex)]
@@ -115,12 +111,10 @@ const PlayerPage: React.FC = () => {
     }
   }, [nextIndex, photos])
 
-  // After preload: drive animation
   useEffect(() => {
     if (nextIndex == null || !nextReady) return
 
     if (settings.transition === 'none') {
-      // instant, fixed issues with flicking, although still some there
       setCurrentIndex(nextIndex)
       setNextIndex(null)
       setIsAnimating(false)
@@ -133,7 +127,6 @@ const PlayerPage: React.FC = () => {
     })
   }, [nextIndex, nextReady, settings.transition])
 
-  //  safety fallback
   const onAnimationEnd = useCallback(() => {
     if (nextIndex == null) return
     setCurrentIndex(nextIndex)
@@ -143,11 +136,10 @@ const PlayerPage: React.FC = () => {
 
   useEffect(() => {
     if (!isAnimating || nextIndex == null) return
-    const safety = window.setTimeout(() => { onAnimationEnd() }, 1600) // > CSS duration
+    const safety = window.setTimeout(() => { onAnimationEnd() }, 1600)
     return () => window.clearTimeout(safety)
   }, [isAnimating, nextIndex, onAnimationEnd])
 
-  // Re-shuffle
   useEffect(() => {
     if (settings.order === 'shuffle' && photos.length > 0) {
       const indices = Array.from({ length: photos.length }, (_, i) => i)
@@ -156,7 +148,6 @@ const PlayerPage: React.FC = () => {
     }
   }, [settings.order, photos.length])
 
-  //  timer
   useEffect(() => {
     if (photos.length === 0 || !isWithinOperatingHours()) return
     const id = window.setInterval(beginTransition, intervalMs)
@@ -174,7 +165,38 @@ const PlayerPage: React.FC = () => {
     try { navigate('/settings') } catch { window.location.href = '/settings' }
   }, [navigate])
 
-  //grid that always fits the screen
+  const getBackgroundStyle = (): React.CSSProperties => {
+    const bgType = settings.background || 'black'
+
+    if (bgType === 'black') {
+      return { background: 'black' }
+    }
+
+    if (bgType === 'gradient') {
+      return {
+        background: 'linear-gradient(to bottom, #87CEEB 0%, #ffffff 100%)'
+      }
+    }
+
+    if (bgType === 'blur') {
+      const currentPhoto = photos[getResolvedIndex(currentIndex)]
+      const firstPhoto = settings.layout === 'grid' ? currentPhoto : currentPhoto
+
+      if (firstPhoto?.url) {
+        return {
+          backgroundImage: `url(${firstPhoto.url})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(40px)',
+          transform: 'scale(1.1)'
+        }
+      }
+      return { background: 'black' }
+    }
+
+    return { background: 'black' }
+  }
+
   const renderGrid = (baseIndex: number) => {
     const items = Array.from({ length: 4 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
     return (
@@ -196,16 +218,16 @@ const PlayerPage: React.FC = () => {
     )
   }
 
-  // Single image centered
   const fixedImageStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit: 'contain',
-    backgroundColor: 'black',
+    backgroundColor: 'transparent',
     display: 'block',
     borderRadius: 12,
     boxShadow: '0 10px 30px rgba(0,0,0,.5)'
   }
+
   const renderSingle = (baseIndex: number) => {
     const photo = photos[getResolvedIndex(baseIndex)]
     if (!photo) return null
@@ -223,8 +245,8 @@ const PlayerPage: React.FC = () => {
   }
 
   const renderByLayout = (idx: number) => {
-    if (settings.layout === 'grid') return renderGrid(idx) // 2×2
-    return renderSingle(idx)                                // single
+    if (settings.layout === 'grid') return renderGrid(idx)
+    return renderSingle(idx)
   }
 
   const outsideHours = !isWithinOperatingHours()
@@ -270,6 +292,7 @@ const PlayerPage: React.FC = () => {
         </div>
     )
   }
+
   const isFade = settings.transition === 'fade'
   const isSlide = settings.transition === 'slide'
 
@@ -301,8 +324,24 @@ const PlayerPage: React.FC = () => {
           role="button"
           aria-label="Toggle header"
           tabIndex={0}
-          style={{ position: 'fixed', inset: 0, background: 'black', overflow: 'hidden' }}
+          style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}
       >
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          ...getBackgroundStyle(),
+          transition: 'all 0.5s ease'
+        }} />
+
+        {settings.background === 'blur' && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0,0,0,0.3)',
+              pointerEvents: 'none'
+            }} />
+        )}
+
         {showHeader && (
             <div
                 onClick={stopPropagation}
