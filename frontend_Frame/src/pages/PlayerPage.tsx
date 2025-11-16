@@ -5,6 +5,7 @@ import { getAlbumPhotos, listAlbums } from '../services/albumService'
 import { useSettings } from '../contexts/SettingsContext'
 import Header from '../components/Header'
 import '../styles/player.css'
+const TRANSITION_MS = 1200
 
 const PlayerPage: React.FC = () => {
   const navigate = useNavigate()
@@ -32,8 +33,12 @@ const PlayerPage: React.FC = () => {
 
   const parseTimingMs = (t?: string) => {
     if (!t) return 5000
-    const m = String(t).trim().match(/^(\d+)\s*s?$/i)
-    return m ? Math.max(1000, parseInt(m[1], 10) * 1000) : 5000
+    const m = String(t).trim().match(/^(\d+)\s*([sm]?)$/i)
+    if (!m) return 5000
+    const value = Math.max(1, parseInt(m[1], 10))
+    const unit = (m[2] || 's').toLowerCase()
+    const ms = unit === 'm' ? value * 60_000 : value * 1_000
+    return Math.max(1000, ms)
   }
   const intervalMs = parseTimingMs(settings?.timing)
 
@@ -136,7 +141,7 @@ const PlayerPage: React.FC = () => {
 
   useEffect(() => {
     if (!isAnimating || nextIndex == null) return
-    const safety = window.setTimeout(() => { onAnimationEnd() }, 1600)
+    const safety = window.setTimeout(() => { onAnimationEnd() }, TRANSITION_MS + 200)
     return () => window.clearTimeout(safety)
   }, [isAnimating, nextIndex, onAnimationEnd])
 
@@ -165,52 +170,49 @@ const PlayerPage: React.FC = () => {
     try { navigate('/settings') } catch { window.location.href = '/settings' }
   }, [navigate])
 
-  const getBackgroundStyle = (): React.CSSProperties => {
+  const getBackgroundClasses = () => {
     const bgType = settings.background || 'black'
+    const classes = ['player-background']
 
     if (bgType === 'black') {
-      return { background: 'black' }
+      classes.push('player-background-black')
+    } else if (bgType === 'gradient') {
+      classes.push('player-background-gradient')
+    } else if (bgType === 'blur') {
+      classes.push('player-background-blur')
     }
 
-    if (bgType === 'gradient') {
-      return {
-        background: 'linear-gradient(to bottom, #87CEEB 0%, #ffffff 100%)'
-      }
-    }
-
-    if (bgType === 'blur') {
-      const currentPhoto = photos[getResolvedIndex(currentIndex)]
-      const firstPhoto = settings.layout === 'grid' ? currentPhoto : currentPhoto
-
-      if (firstPhoto?.url) {
-        return {
-          backgroundImage: `url(${firstPhoto.url})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(40px)',
-          transform: 'scale(1.1)'
-        }
-      }
-      return { background: 'black' }
-    }
-
-    return { background: 'black' }
+    return classes.join(' ')
   }
 
+  const getBackgroundImageStyle = () => {
+    if (settings.background === 'blur') {
+      const currentPhoto = photos[getResolvedIndex(currentIndex)]
+      if (currentPhoto?.url) {
+        return { backgroundImage: `url(${currentPhoto.url})` }
+      }
+    }
+    return {}
+  }
+
+
+  const SmartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+    const [panClass, setPanClass] = useState<'player-img-pan-horizontal' | 'player-img-pan-vertical'>('player-img-pan-horizontal')
+    const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+      const img = e.currentTarget
+      const isPortrait = img.naturalHeight >= img.naturalWidth
+      setPanClass(isPortrait ? 'player-img-pan-vertical' : 'player-img-pan-horizontal')
+    }, [])
+    return <img src={src} alt={alt} className={panClass} draggable={false} decoding="async" onLoad={handleLoad} />
+  }
   const renderGrid = (baseIndex: number) => {
-    const items = Array.from({ length: 4 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
+    const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
     return (
-        <div className="player-grid">
+        <div className="player-grid-2x1">
           {items.map((p, i) => (
-              <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell">
+              <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-horizontal">
                 {p && (
-                    <img
-                        src={p.url}
-                        alt={p.caption || `Photo ${i + 1}`}
-                        className="player-img"
-                        draggable={false}
-                        decoding="async"
-                    />
+                    <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
                 )}
               </div>
           ))}
@@ -218,25 +220,31 @@ const PlayerPage: React.FC = () => {
     )
   }
 
-  const fixedImageStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-    backgroundColor: 'transparent',
-    display: 'block',
-    borderRadius: 12,
-    boxShadow: '0 10px 30px rgba(0,0,0,.5)'
-  }
-
   const renderSingle = (baseIndex: number) => {
     const photo = photos[getResolvedIndex(baseIndex)]
     if (!photo) return null
+
+    if (settings.layout === 'split') {
+      const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
+      return (
+          <div className="player-grid-split">
+            {items.map((p, i) => (
+                <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-vertical">
+                  {p && (
+                      <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
+                  )}
+                </div>
+            ))}
+          </div>
+      )
+    }
+
     return (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="player-single-container">
           <img
               src={photo.url}
               alt={photo.caption || 'Photo'}
-              style={fixedImageStyle}
+              className="player-single-img"
               draggable={false}
               decoding="async"
           />
@@ -253,39 +261,30 @@ const PlayerPage: React.FC = () => {
 
   if (loading) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 18 }}>Loading photos...</div>
+        <div className="player-loading">
+          <div className="player-loading-text">Loading photos...</div>
         </div>
     )
   }
 
   if (error || photos.length === 0) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 18 }}>{error || 'No photos available'}</div>
+        <div className="player-error">
+          <div className="player-error-text">{error || 'No photos available'}</div>
         </div>
     )
   }
 
   if (outsideHours) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div className="player-inactive">
           <div>
-            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Display Inactive</h2>
-            <p style={{ fontSize: 18, marginBottom: 6 }}>Outside operating hours</p>
-            <p style={{ fontSize: 16, opacity: 0.75 }}>
+            <h2 className="player-inactive-title">Display Inactive</h2>
+            <p className="player-inactive-message">Outside operating hours</p>
+            <p className="player-inactive-hours">
               Active from {settings.startTime} to {settings.endTime}
             </p>
-            <button
-                onClick={goSettings}
-                style={{
-                  marginTop: 24, padding: '12px 20px', background: 'rgba(255,255,255,.1)',
-                  borderRadius: 10, color: 'white', border: 'none', cursor: 'pointer'
-                }}
-            >
+            <button onClick={goSettings} className="player-inactive-button">
               Open Settings
             </button>
           </div>
@@ -324,35 +323,17 @@ const PlayerPage: React.FC = () => {
           role="button"
           aria-label="Toggle header"
           tabIndex={0}
-          style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}
+          className="player-root"
+          style={{ ['--player-transition-ms' as any]: `${TRANSITION_MS}ms` }}
       >
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          ...getBackgroundStyle(),
-          transition: 'all 0.5s ease'
-        }} />
+        <div className={getBackgroundClasses()} style={getBackgroundImageStyle()} />
 
         {settings.background === 'blur' && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'rgba(0,0,0,0.3)',
-              pointerEvents: 'none'
-            }} />
+            <div className="player-background-overlay" />
         )}
 
         {showHeader && (
-            <div
-                onClick={stopPropagation}
-                style={{
-                  position: 'absolute',
-                  left: 0, right: 0, top: 0,
-                  zIndex: 50,
-                  background: 'rgba(0,0,0,0.7)',
-                  backdropFilter: 'blur(6px)'
-                }}
-            >
+            <div onClick={stopPropagation} className="player-header-container">
               <Header />
             </div>
         )}
