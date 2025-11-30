@@ -7,7 +7,8 @@
 // - 'player-state:*' keys for runtime playback state
 
 import * as kv from '../db/kvRepo.js';
-import { ValidationError, NotFoundError } from '../middleware/errorHandler.js';
+import {ValidationError} from "../modules/errors.js";
+
 
 // Default settings for the player (photo frame)
 const DEFAULT_PLAYER_SETTINGS = {
@@ -23,6 +24,7 @@ const DEFAULT_PLAYER_SETTINGS = {
 };
 
 // Valid values for player settings
+// Only used for warnings, not strict validation
 const VALID_LAYOUTS = ['single', 'grid', 'split'];
 const VALID_TRANSITIONS = ['none', 'fade', 'slide'];
 const VALID_TIMINGS = ['10s', '30s', '1m'];
