@@ -4,7 +4,8 @@ import type { Photo } from '../services/photoService'
 import { getAlbumPhotos, listAlbums } from '../services/albumService'
 import { useSettings } from '../contexts/SettingsContext'
 import Header from '../components/Header'
-import '../styles/player.css'  // plain-CSS , tailwind was not working with me
+import '../styles/player.css'
+const TRANSITION_MS = 1200
 
 const PlayerPage: React.FC = () => {
   const navigate = useNavigate()
@@ -18,10 +19,9 @@ const PlayerPage: React.FC = () => {
   const hideTimerRef = useRef<number | null>(null)
   const [isAnimating, setIsAnimating] = useState(false)
   const [nextIndex, setNextIndex] = useState<number | null>(null)
-  const [direction] = useState<'left' | 'right'>('left') // slide-in direction , this section is still buggy with the transition
-  const [nextReady, setNextReady] = useState(false)       // preload guard, helped with bugs
+  const [direction] = useState<'left' | 'right'>('left')
+  const [nextReady, setNextReady] = useState(false)
 
-//shuffle func
   const shuffleArray = (array: number[]): number[] => {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -33,8 +33,12 @@ const PlayerPage: React.FC = () => {
 
   const parseTimingMs = (t?: string) => {
     if (!t) return 5000
-    const m = String(t).trim().match(/^(\d+)\s*s?$/i) // "10s" or "10"
-    return m ? Math.max(1000, parseInt(m[1], 10) * 1000) : 5000
+    const m = String(t).trim().match(/^(\d+)\s*([sm]?)$/i)
+    if (!m) return 5000
+    const value = Math.max(1, parseInt(m[1], 10))
+    const unit = (m[2] || 's').toLowerCase()
+    const ms = unit === 'm' ? value * 60_000 : value * 1_000
+    return Math.max(1000, ms)
   }
   const intervalMs = parseTimingMs(settings?.timing)
 
@@ -76,7 +80,6 @@ const PlayerPage: React.FC = () => {
     loadPhotos()
   }, [settings.activeAlbum, settings.maxImages])
 
-  // issues with image indexing
   const getResolvedIndex = (idx: number) => {
     if (photos.length === 0) return 0
     return settings.order === 'shuffle'
@@ -89,7 +92,6 @@ const PlayerPage: React.FC = () => {
     return (currentIndex + 1) % photos.length
   }, [currentIndex, photos.length])
 
-  // transition cycles, preparing before hand
   const beginTransition = useCallback(() => {
     if (photos.length === 0 || isAnimating) return
     const ni = computeNextIndex()
@@ -97,7 +99,6 @@ const PlayerPage: React.FC = () => {
     setIsAnimating(false)
   }, [photos.length, isAnimating, computeNextIndex])
 
-  // Preload next image whenever nextIndex changes
   useEffect(() => {
     if (nextIndex == null) { setNextReady(false); return }
     const next = photos[getResolvedIndex(nextIndex)]
@@ -115,12 +116,10 @@ const PlayerPage: React.FC = () => {
     }
   }, [nextIndex, photos])
 
-  // After preload: drive animation
   useEffect(() => {
     if (nextIndex == null || !nextReady) return
 
     if (settings.transition === 'none') {
-      // instant, fixed issues with flicking, although still some there
       setCurrentIndex(nextIndex)
       setNextIndex(null)
       setIsAnimating(false)
@@ -133,7 +132,6 @@ const PlayerPage: React.FC = () => {
     })
   }, [nextIndex, nextReady, settings.transition])
 
-  //  safety fallback
   const onAnimationEnd = useCallback(() => {
     if (nextIndex == null) return
     setCurrentIndex(nextIndex)
@@ -143,11 +141,10 @@ const PlayerPage: React.FC = () => {
 
   useEffect(() => {
     if (!isAnimating || nextIndex == null) return
-    const safety = window.setTimeout(() => { onAnimationEnd() }, 1600) // > CSS duration
+    const safety = window.setTimeout(() => { onAnimationEnd() }, TRANSITION_MS + 200)
     return () => window.clearTimeout(safety)
   }, [isAnimating, nextIndex, onAnimationEnd])
 
-  // Re-shuffle
   useEffect(() => {
     if (settings.order === 'shuffle' && photos.length > 0) {
       const indices = Array.from({ length: photos.length }, (_, i) => i)
@@ -156,7 +153,6 @@ const PlayerPage: React.FC = () => {
     }
   }, [settings.order, photos.length])
 
-  //  timer
   useEffect(() => {
     if (photos.length === 0 || !isWithinOperatingHours()) return
     const id = window.setInterval(beginTransition, intervalMs)
@@ -174,21 +170,49 @@ const PlayerPage: React.FC = () => {
     try { navigate('/settings') } catch { window.location.href = '/settings' }
   }, [navigate])
 
-  //grid that always fits the screen
+  const getBackgroundClasses = () => {
+    const bgType = settings.background || 'black'
+    const classes = ['player-background']
+
+    if (bgType === 'black') {
+      classes.push('player-background-black')
+    } else if (bgType === 'gradient') {
+      classes.push('player-background-gradient')
+    } else if (bgType === 'blur') {
+      classes.push('player-background-blur')
+    }
+
+    return classes.join(' ')
+  }
+
+  const getBackgroundImageStyle = () => {
+    if (settings.background === 'blur') {
+      const currentPhoto = photos[getResolvedIndex(currentIndex)]
+      if (currentPhoto?.url) {
+        return { backgroundImage: `url(${currentPhoto.url})` }
+      }
+    }
+    return {}
+  }
+
+
+  const SmartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+    const [panClass, setPanClass] = useState<'player-img-pan-horizontal' | 'player-img-pan-vertical'>('player-img-pan-horizontal')
+    const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+      const img = e.currentTarget
+      const isPortrait = img.naturalHeight >= img.naturalWidth
+      setPanClass(isPortrait ? 'player-img-pan-vertical' : 'player-img-pan-horizontal')
+    }, [])
+    return <img src={src} alt={alt} className={panClass} draggable={false} decoding="async" onLoad={handleLoad} />
+  }
   const renderGrid = (baseIndex: number) => {
-    const items = Array.from({ length: 4 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
+    const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
     return (
-        <div className="player-grid">
+        <div className="player-grid-2x1">
           {items.map((p, i) => (
-              <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell">
+              <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-horizontal">
                 {p && (
-                    <img
-                        src={p.url}
-                        alt={p.caption || `Photo ${i + 1}`}
-                        className="player-img"
-                        draggable={false}
-                        decoding="async"
-                    />
+                    <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
                 )}
               </div>
           ))}
@@ -196,25 +220,31 @@ const PlayerPage: React.FC = () => {
     )
   }
 
-  // Single image centered
-  const fixedImageStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-    backgroundColor: 'black',
-    display: 'block',
-    borderRadius: 12,
-    boxShadow: '0 10px 30px rgba(0,0,0,.5)'
-  }
   const renderSingle = (baseIndex: number) => {
     const photo = photos[getResolvedIndex(baseIndex)]
     if (!photo) return null
+
+    if (settings.layout === 'split') {
+      const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
+      return (
+          <div className="player-grid-split">
+            {items.map((p, i) => (
+                <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-vertical">
+                  {p && (
+                      <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
+                  )}
+                </div>
+            ))}
+          </div>
+      )
+    }
+
     return (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="player-single-container">
           <img
               src={photo.url}
               alt={photo.caption || 'Photo'}
-              style={fixedImageStyle}
+              className="player-single-img"
               draggable={false}
               decoding="async"
           />
@@ -223,53 +253,45 @@ const PlayerPage: React.FC = () => {
   }
 
   const renderByLayout = (idx: number) => {
-    if (settings.layout === 'grid') return renderGrid(idx) // 2×2
-    return renderSingle(idx)                                // single
+    if (settings.layout === 'grid') return renderGrid(idx)
+    return renderSingle(idx)
   }
 
   const outsideHours = !isWithinOperatingHours()
 
   if (loading) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 18 }}>Loading photos...</div>
+        <div className="player-loading">
+          <div className="player-loading-text">Loading photos...</div>
         </div>
     )
   }
 
   if (error || photos.length === 0) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 18 }}>{error || 'No photos available'}</div>
+        <div className="player-error">
+          <div className="player-error-text">{error || 'No photos available'}</div>
         </div>
     )
   }
 
   if (outsideHours) {
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'black', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div className="player-inactive">
           <div>
-            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>Display Inactive</h2>
-            <p style={{ fontSize: 18, marginBottom: 6 }}>Outside operating hours</p>
-            <p style={{ fontSize: 16, opacity: 0.75 }}>
+            <h2 className="player-inactive-title">Display Inactive</h2>
+            <p className="player-inactive-message">Outside operating hours</p>
+            <p className="player-inactive-hours">
               Active from {settings.startTime} to {settings.endTime}
             </p>
-            <button
-                onClick={goSettings}
-                style={{
-                  marginTop: 24, padding: '12px 20px', background: 'rgba(255,255,255,.1)',
-                  borderRadius: 10, color: 'white', border: 'none', cursor: 'pointer'
-                }}
-            >
+            <button onClick={goSettings} className="player-inactive-button">
               Open Settings
             </button>
           </div>
         </div>
     )
   }
+
   const isFade = settings.transition === 'fade'
   const isSlide = settings.transition === 'slide'
 
@@ -301,19 +323,17 @@ const PlayerPage: React.FC = () => {
           role="button"
           aria-label="Toggle header"
           tabIndex={0}
-          style={{ position: 'fixed', inset: 0, background: 'black', overflow: 'hidden' }}
+          className="player-root"
+          style={{ ['--player-transition-ms' as any]: `${TRANSITION_MS}ms` }}
       >
+        <div className={getBackgroundClasses()} style={getBackgroundImageStyle()} />
+
+        {settings.background === 'blur' && (
+            <div className="player-background-overlay" />
+        )}
+
         {showHeader && (
-            <div
-                onClick={stopPropagation}
-                style={{
-                  position: 'absolute',
-                  left: 0, right: 0, top: 0,
-                  zIndex: 50,
-                  background: 'rgba(0,0,0,0.7)',
-                  backdropFilter: 'blur(6px)'
-                }}
-            >
+            <div onClick={stopPropagation} className="player-header-container">
               <Header />
             </div>
         )}
