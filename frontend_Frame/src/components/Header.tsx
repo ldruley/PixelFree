@@ -1,13 +1,10 @@
 import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const Header: React.FC = () => {
   const { authStatus, logout } = useAuth()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const location = useLocation()
-
-  const isActive = (path: string) => location.pathname === path
 
   const handleLogout = async () => {
     try {
@@ -32,18 +29,6 @@ const Header: React.FC = () => {
         <div className="navbar-menu">
           {authStatus.isAuthenticated ? (
             <>
-              <Link 
-                to="/settings"
-                className={`nav-link ${isActive('/settings') ? 'active' : ''}`}
-              >
-                Settings
-              </Link>
-              <Link 
-                to="/"
-                className={`nav-link ${isActive('/') ? 'active' : ''}`}
-              >
-                Player
-              </Link>
               {authStatus.user?.display_name && (
                 <span className="user-name">
                   {authStatus.user.display_name}
