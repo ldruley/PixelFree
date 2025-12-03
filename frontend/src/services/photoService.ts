@@ -40,14 +40,15 @@ export interface PhotoQueryResponse {
   }>;
 }
 
-const API_BASE = ''; // Use relative URLs - Vite proxy handles routing
+// Import centralized API configuration
+import { API_CONFIG } from '../config';
 
 /**
  * Query photos using the advanced query API
  */
 export const queryPhotos = async (query: PhotoQueryRequest): Promise<Photo[]> => {
   try {
-    const response = await fetch(`${API_BASE}/api/photos/query`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/photos/query`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

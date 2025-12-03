@@ -1,9 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './contexts/AuthContext'
 import { SettingsProvider } from './contexts/SettingsContext'
-import Header from './components/Header'
 import ProtectedRoute from './components/ProtectedRoute'
+import SharedLayout from './components/SharedLayout'
 import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
 import AlbumsPage from './pages/AlbumsPage'
 import AlbumGalleryPage from './pages/AlbumGalleryPage'
 import FavoritesPage from './pages/FavoritesPage'
@@ -14,6 +16,7 @@ function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
+        <Toaster />
         <Router>
           <Routes>
             {/* Full-screen player route without header */}
@@ -26,57 +29,20 @@ function App() {
               } 
             />
             
-            {/* All other routes with header */}
-            <Route path="/*" element={
-              <div>
-                <Header />
-                <main>
-                  <Routes>
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route 
-                      path="/albums/:id" 
-                      element={
-                        <ProtectedRoute>
-                          <AlbumGalleryPage />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/albums" 
-                      element={
-                        <ProtectedRoute>
-                          <AlbumsPage />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/favorites" 
-                      element={
-                        <ProtectedRoute>
-                          <FavoritesPage />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/display" 
-                      element={
-                        <ProtectedRoute>
-                          <DisplayPage />
-                        </ProtectedRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/" 
-                      element={
-                        <ProtectedRoute>
-                          <AlbumsPage />
-                        </ProtectedRoute>
-                      } 
-                    />
-                  </Routes>
-                </main>
-              </div>
-            } />
+            {/* Main App Routes with Shared Layout */}
+            <Route element={<ProtectedRoute><SharedLayout /></ProtectedRoute>}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/albums" element={<AlbumsPage />} />
+              <Route path="/albums/:id" element={<AlbumGalleryPage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
+              <Route path="/display" element={<DisplayPage />} />
+            </Route>
+            
+            {/* Login Route */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Fallback for any unmatched routes */}
+            <Route path="*" element={<LoginPage />} />
           </Routes>
         </Router>
       </SettingsProvider>

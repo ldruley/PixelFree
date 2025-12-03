@@ -2,6 +2,7 @@ import React from 'react'
 import type { ReactElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import Loading from './Loading'
 
 interface ProtectedRouteProps {
   children: ReactElement
@@ -12,10 +13,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div>
-        <div>
-          <p>Loading...</p>
-        </div>
+      <div className="app-content">
+        <Loading message="Checking authentication..." />
       </div>
     )
   }

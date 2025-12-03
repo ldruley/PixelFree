@@ -60,7 +60,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings)
-        console.log('Loading saved settings:', parsed)
         // Ensure all required fields are present by merging with defaults
         const mergedSettings = { ...defaultSettings, ...parsed }
         setSettings(mergedSettings)
@@ -69,7 +68,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         setSettings(defaultSettings)
       }
     } else {
-      console.log('No saved settings found, using defaults')
       setSettings(defaultSettings)
     }
   }, [])
@@ -79,7 +77,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   
   useEffect(() => {
     if (isInitialized) {
-      console.log('Saving settings to localStorage:', settings)
       localStorage.setItem('pixelfree-player-settings', JSON.stringify(settings))
     }
   }, [settings, isInitialized])
@@ -91,16 +88,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, [])
 
   const updateSettings = (newSettings: Partial<PlayerSettings>) => {
-    console.log('SettingsContext: updateSettings called with:', newSettings)
-    setSettings(prev => {
-      const updated = { ...prev, ...newSettings }
-      console.log('SettingsContext: Updated settings:', updated)
-      return updated
-    })
+    setSettings(prev => ({ ...prev, ...newSettings }))
   }
 
   const resetSettings = () => {
-    console.log('Resetting settings to defaults')
     localStorage.removeItem('pixelfree-player-settings')
     setSettings(defaultSettings)
   }

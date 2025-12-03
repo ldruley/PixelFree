@@ -65,7 +65,8 @@ export interface AlbumListResponse {
   limit: number;
 }
 
-const API_BASE = ''; // Use relative URLs - Vite proxy handles routing
+// Import centralized API configuration
+import { API_CONFIG } from '../config';
 
 /**
  * List all albums
@@ -81,7 +82,7 @@ export const listAlbums = async (options: {
     if (options.limit != null) params.set('limit', String(options.limit));
     if (options.enabled != null) params.set('enabled', String(options.enabled));
 
-    const response = await fetch(`${API_BASE}/api/albums?${params.toString()}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums?${params.toString()}`, {
       method: 'GET',
       credentials: 'include', // Include cookies for auth
     });
@@ -102,7 +103,7 @@ export const listAlbums = async (options: {
  */
 export const getAlbum = async (id: string): Promise<Album> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums/${id}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -123,7 +124,7 @@ export const getAlbum = async (id: string): Promise<Album> => {
  */
 export const createAlbum = async (data: CreateAlbumRequest): Promise<Album> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +151,7 @@ export const createAlbum = async (data: CreateAlbumRequest): Promise<Album> => {
  */
 export const updateAlbum = async (id: string, data: UpdateAlbumRequest): Promise<Album> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums/${id}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ export const updateAlbum = async (id: string, data: UpdateAlbumRequest): Promise
  */
 export const deleteAlbum = async (id: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums/${id}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -196,7 +197,7 @@ export const deleteAlbum = async (id: string): Promise<void> => {
  */
 export const toggleAlbum = async (id: string, enabled: boolean): Promise<Album> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums/${id}/toggle`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}/toggle`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -229,7 +230,7 @@ export const refreshAlbum = async (id: string): Promise<{
   linked: number;
 }> => {
   try {
-    const response = await fetch(`${API_BASE}/api/albums/${id}/refresh`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -257,7 +258,7 @@ export const getAlbumPhotos = async (
     if (options.offset != null) params.set('offset', String(options.offset));
     if (options.limit != null) params.set('limit', String(options.limit));
 
-    const response = await fetch(`${API_BASE}/api/albums/${id}/photos?${params.toString()}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${id}/photos?${params.toString()}`, {
       method: 'GET',
       credentials: 'include',
     });

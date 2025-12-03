@@ -18,6 +18,7 @@
 import * as albumRepo from '../db/albumRepo.js';
 import * as photoRepo from '../db/photoRepo.js';
 import * as photoFetcher from './photoFetcher.js';
+import { resolveManyAccts } from '../modules/accounts.js';
 
 /**
  * Transform a raw database album row into a consistent shaped object.
@@ -176,10 +177,41 @@ async function fetchPhotosForQuery(query, opts = {}) {
     if (type === 'tag') {
         candidates = await photoFetcher.getLatestPhotosForTags(tags, fetchParams);
     } else if (type === 'user') {
-        candidates = await photoFetcher.getLatestPhotosForUsers(users, fetchParams);
+        // Resolve usernames to account IDs at query time
+        const accts = users.accts || [];
+        const ids = users.ids || [];
+        
+        // Resolve accts to IDs
+        const resolvedIds = accts.length > 0 
+            ? await resolveManyAccts(accts) 
+            : [];
+        
+        // Combine with any pre-resolved IDs
+        const allIds = [...resolvedIds, ...ids];
+        
+        if (allIds.length === 0) {
+            throw new Error('No valid user accounts found');
+        }
+        
+        candidates = await photoFetcher.getLatestPhotosForUsers(allIds, fetchParams);
     } else if (type === 'compound') {
+        // Resolve usernames for compound queries (user + tag)
+        const accts = users.accts || [];
+        const ids = users.ids || [];
+        
+        const resolvedIds = accts.length > 0 
+            ? await resolveManyAccts(accts) 
+            : [];
+        
+        const allIds = [...resolvedIds, ...ids];
+        
+        if (allIds.length === 0) {
+            throw new Error('No valid user accounts found');
+        }
+        
+        // This fetches posts from users, then filters by tags locally
         candidates = await photoFetcher.getLatestPhotosCompound(
-            { tags, accountIds: users },
+            { tags, accountIds: allIds },
             fetchParams
         );
     } else {

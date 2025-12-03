@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import AlbumCard from '../components/AlbumCard';
-import AlbumForm from '../components/AlbumForm';
-import type { Album, CreateAlbumRequest } from '../services/albumService';
-import {
-  listAlbums,
-  createAlbum,
-  updateAlbum,
+import { useNavigate } from 'react-router-dom';
+import { 
+  listAlbums, 
+  createAlbum, 
   deleteAlbum,
-  toggleAlbum,
   refreshAlbum,
+  type Album, 
+  type CreateAlbumRequest 
 } from '../services/albumService';
+import { getAlbumPhotos } from '../services/albumService';
+import { FiPlus, FiCheck } from 'react-icons/fi';
+import AlbumForm from '../components/AlbumForm';
+import Loading from '../components/Loading';
+import { showError, showSuccess } from '../utils/toast';
+import { loadAllPages } from '../utils/helpers';
 
 const AlbumsPage: React.FC = () => {
+  const navigate = useNavigate();
+  
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumThumbnails, setAlbumThumbnails] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
   
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -28,15 +38,46 @@ const AlbumsPage: React.FC = () => {
   const loadAlbums = async () => {
     try {
       setIsLoading(true);
-      setError(null);
-      const response = await listAlbums({ limit: 100 });
-      setAlbums(response.items);
+      
+      // Fetch all albums using helper (no limit on albums)
+      const allAlbums = await loadAllPages<Album>(listAlbums);
+      
+      setAlbums(allAlbums);
+      
+      // Load thumbnails
+      loadAlbumThumbnails(allAlbums);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load albums');
+      showError(err instanceof Error ? err.message : 'Failed to load albums');
       console.error('Error loading albums:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadAlbumThumbnails = async (albumsList: Album[]) => {
+    // Load all thumbnails in parallel for better performance
+    const thumbnailPromises = albumsList.map(async (album) => {
+      try {
+        const response = await getAlbumPhotos(album.id, { limit: 1 });
+        if (response.items.length > 0) {
+          return { id: album.id, url: response.items[0].preview_url || response.items[0].url };
+        }
+        return null;
+      } catch (error) {
+        console.error(`Failed to load thumbnail for album ${album.id}:`, error);
+        return null;
+      }
+    });
+
+    const results = await Promise.all(thumbnailPromises);
+    const thumbnails: Record<string, string> = {};
+    results.forEach(result => {
+      if (result) {
+        thumbnails[result.id] = result.url;
+      }
+    });
+    
+    setAlbumThumbnails(thumbnails);
   };
 
   const handleCreateAlbum = async (data: CreateAlbumRequest) => {
@@ -44,70 +85,56 @@ const AlbumsPage: React.FC = () => {
       const newAlbum = await createAlbum(data);
       setShowForm(false);
       
-      // Show a loading message
-      setError(null);
-      
       // Automatically fetch photos for the new album
       try {
-        const refreshResult = await refreshAlbum(newAlbum.id);
-        console.log('Album refresh result:', refreshResult);
-        
-        if (refreshResult.fetched === 0) {
-          alert(`Album "${newAlbum.name}" created, but no photos were found. This could mean:\n\n` +
-                `• The tag/user has no recent posts\n` +
-                `• You may not have access to view those posts\n` +
-                `• Try a different tag or user\n\n` +
-                `You can manually refresh the album later.`);
-        } else {
-          alert(`Album "${newAlbum.name}" created successfully!\n\n` +
-                `Fetched: ${refreshResult.fetched} photos\n` +
-                `Added: ${refreshResult.linked} photos to album`);
-        }
+        await refreshAlbum(newAlbum.id);
       } catch (refreshErr) {
         console.error('Failed to fetch photos for new album:', refreshErr);
-        alert(`Album "${newAlbum.name}" created, but failed to fetch photos.\n\n` +
-              `Error: ${refreshErr instanceof Error ? refreshErr.message : 'Unknown error'}\n\n` +
-              `You can try refreshing the album manually from the Albums page.`);
       }
       
       await loadAlbums();
     } catch (err) {
       console.error('Failed to create album:', err);
-      throw err;
+      showError(err instanceof Error ? err.message : 'Failed to create album');
     }
   };
 
-  const handleUpdateAlbum = async (data: CreateAlbumRequest) => {
-    if (editingAlbum) {
-      await updateAlbum(editingAlbum.id, data);
-      await loadAlbums();
-      setShowForm(false);
-      setEditingAlbum(null);
-    }
-  };
-
-  const handleEditAlbum = (album: Album) => {
-    setEditingAlbum(album);
-    setShowForm(true);
-  };
-
-  const handleDeleteAlbum = async (album: Album) => {
-    if (confirm(`Are you sure you want to delete "${album.name}"?`)) {
+  const handleDeleteSelected = async () => {
+    if (selectedAlbumIds.size === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${selectedAlbumIds.size} albums?`)) {
       try {
-        await deleteAlbum(album.id);
+        for (const id of selectedAlbumIds) {
+          await deleteAlbum(id);
+        }
+        setSelectedAlbumIds(new Set());
+        setIsSelectionMode(false);
         await loadAlbums();
+        showSuccess(`Successfully deleted ${selectedAlbumIds.size} album(s)`);
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Failed to delete album');
+        showError(err instanceof Error ? err.message : 'Failed to delete albums');
       }
     }
   };
 
-  const handleToggleAlbum = async (album: Album, enabled: boolean) => {
-    try {
-      await toggleAlbum(album.id, enabled);
-      await loadAlbums();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to toggle album');
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedAlbumIds(new Set());
+  };
+
+  const handleCardClick = (albumId: string) => {
+    if (isSelectionMode) {
+      // Toggle selection if in selection mode
+      const newSelected = new Set(selectedAlbumIds);
+      if (newSelected.has(albumId)) {
+        newSelected.delete(albumId);
+      } else {
+        newSelected.add(albumId);
+      }
+      setSelectedAlbumIds(newSelected);
+    } else {
+      // Navigate to album
+      navigate(`/albums/${albumId}`);
     }
   };
 
@@ -121,46 +148,69 @@ const AlbumsPage: React.FC = () => {
     setShowForm(true);
   };
 
+  if (isLoading) {
+    return (
+      <div className="app-content">
+        <Loading />
+      </div>
+    );
+  }
+
   return (
-    <div className="page-container">
-      {/* Simple Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Albums</h1>
-        </div>
-        <button className="btn btn-primary" onClick={handleNewAlbum}>
-          + Create New Album
+    <div className="app-content">
+      <div className="page-header-actions">
+        <h1 className="app-page-title">Albums</h1>
+        <button className="action-btn" onClick={toggleSelectionMode}>
+          {isSelectionMode ? 'Done' : 'Select'}
         </button>
       </div>
 
-      {error && (
-        <div className="error-banner">
-          {error}
-        </div>
-      )}
+      <div className="albums-grid-container">
+        {albums.map((album) => (
+          <div 
+            key={album.id} 
+            className="album-card"
+            onClick={() => handleCardClick(album.id)}
+          >
+            <div className="album-card-image">
+              {albumThumbnails[album.id] ? (
+                <img src={albumThumbnails[album.id]} alt={album.name} />
+              ) : (
+                <div className="album-placeholder" />
+              )}
+              
+              {isSelectionMode && (
+                <div 
+                  className={`selection-checkbox ${selectedAlbumIds.has(album.id) ? 'selected' : ''}`}
+                >
+                  {selectedAlbumIds.has(album.id) && <FiCheck size={14} />}
+                </div>
+              )}
+            </div>
+            <span className="album-card-title">{album.name}</span>
+          </div>
+        ))}
 
-      {isLoading ? (
-        <div className="empty-state">
-          Loading albums...
+        {/* Create New Card */}
+        <div className="album-card" onClick={handleNewAlbum}>
+          <div className="create-new-card">
+            <FiPlus className="create-new-icon" />
+          </div>
+          <span className="album-card-title">Create New</span>
         </div>
-      ) : albums.length > 0 ? (
-        <div className="albums-grid">
-          {albums.map((album) => (
-            <AlbumCard
-              key={album.id}
-              album={album}
-              onEdit={handleEditAlbum}
-              onDelete={handleDeleteAlbum}
-              onToggle={handleToggleAlbum}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="empty-state">
-          <p className="empty-state-message">No albums yet</p>
-          <button className="btn btn-primary" onClick={handleNewAlbum}>
-            Create Album
+      </div>
+
+      {/* Bottom Action Bar (Selection Mode) */}
+      {isSelectionMode && (
+        <div className="bottom-action-bar">
+          <button className="pill-btn cancel" onClick={toggleSelectionMode}>
+            Cancel
           </button>
+          {selectedAlbumIds.size > 0 && (
+            <button className="pill-btn delete" onClick={handleDeleteSelected}>
+              Delete ({selectedAlbumIds.size})
+            </button>
+          )}
         </div>
       )}
 
@@ -170,7 +220,7 @@ const AlbumsPage: React.FC = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <AlbumForm
               album={editingAlbum}
-              onSave={editingAlbum ? handleUpdateAlbum : handleCreateAlbum}
+              onSave={handleCreateAlbum}
               onCancel={handleFormClose}
             />
           </div>

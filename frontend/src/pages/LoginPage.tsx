@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { showError } from '../utils/toast'
+import '../styles/AppLayout.css'
 
 const LoginPage: React.FC = () => {
   const { authStatus, isLoading, login } = useAuth()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -17,12 +18,15 @@ const LoginPage: React.FC = () => {
       // Remove the auth parameter from URL
       setSearchParams({})
       // Hide success message after 5 seconds, then redirect
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setShowSuccess(false)
         if (authStatus.isAuthenticated) {
           navigate('/albums')
         }
       }, 5000)
+      
+      // Cleanup timeout on unmount
+      return () => clearTimeout(timeoutId)
     }
   }, [searchParams, setSearchParams, authStatus.isAuthenticated, navigate])
 
@@ -36,12 +40,11 @@ const LoginPage: React.FC = () => {
   const handleLogin = async () => {
     try {
       setIsLoggingIn(true)
-      setError(null)
       await login()
       // Note: login() will redirect to Pixelfed, so we won't reach this point
       // unless there's an error
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
+      showError(err instanceof Error ? err.message : 'Login failed. Please try again.')
       setIsLoggingIn(false)
     }
   }
@@ -88,12 +91,6 @@ const LoginPage: React.FC = () => {
           >
             {isLoggingIn ? 'Connecting...' : 'Connect to Pixelfed'}
           </button>
-          
-          {error && (
-            <div className="form-error">
-              {error}
-            </div>
-          )}
           
           <p className="form-help-text help-text-centered">
             You'll be redirected to Pixelfed to authorize PixelFree.
