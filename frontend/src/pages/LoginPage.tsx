@@ -5,7 +5,7 @@ import { showError } from '../utils/toast'
 import '../styles/AppLayout.css'
 
 const LoginPage: React.FC = () => {
-  const { authStatus, isLoading, login } = useAuth()
+  const { authStatus, isLoading, login, refreshAuthStatus } = useAuth()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const navigate = useNavigate()
@@ -13,27 +13,27 @@ const LoginPage: React.FC = () => {
 
   // Check for authentication success parameter
   useEffect(() => {
-    if (searchParams.get('auth') === 'success') {
-      setShowSuccess(true)
-      // Remove the auth parameter from URL
-      setSearchParams({})
-      // Hide success message after 5 seconds, then redirect
-      const timeoutId = setTimeout(() => {
-        setShowSuccess(false)
-        if (authStatus.isAuthenticated) {
-          navigate('/albums')
-        }
-      }, 5000)
-      
-      // Cleanup timeout on unmount
-      return () => clearTimeout(timeoutId)
+    const handleAuthSuccess = async () => {
+      if (searchParams.get('auth') === 'success') {
+        setShowSuccess(true)
+        setSearchParams({})
+        
+        await refreshAuthStatus(false)
+        
+        setTimeout(() => {
+          setShowSuccess(false)
+          navigate('/albums', { replace: true })
+        }, 1500)
+      }
     }
-  }, [searchParams, setSearchParams, authStatus.isAuthenticated, navigate])
+    
+    handleAuthSuccess()
+  }, [])
 
-  // Redirect if already authenticated (but not if showing success message - this will take user to album for more guided flow  )
+  // Redirect if already authenticated (but not if showing success message)
   useEffect(() => {
     if (authStatus.isAuthenticated && !showSuccess) {
-      navigate('/albums')
+      navigate('/albums', { replace: true })
     }
   }, [authStatus.isAuthenticated, navigate, showSuccess])
 
