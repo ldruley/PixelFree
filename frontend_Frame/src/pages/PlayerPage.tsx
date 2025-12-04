@@ -17,15 +17,14 @@ type PlayerSettings = {
   transition: PlayerTransition
   timing: string
   order: PlayerOrder
-  startTime: string // "HH:MM"
-  endTime: string   // "HH:MM"
+  startTime: string 
+  endTime: string   
   maxImages: number
   recencyWindow: number
   activeAlbum: string
   background?: PlayerBackground
 }
 
-// Mirror backend defaults + a background default
 const DEFAULT_SETTINGS: PlayerSettings = {
   layout: 'single',
   transition: 'fade',
@@ -80,8 +79,6 @@ const PlayerPage: React.FC = () => {
 
   const intervalMs = parseTimingMs(effectiveSettings.timing)
 
-  // Load player settings from API (instead of local/context)
-  // GET /api/settings/player  -> { settings: { ... } }
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -99,7 +96,6 @@ const PlayerPage: React.FC = () => {
         }))
       } catch (err) {
         console.error('Error loading player settings:', err)
-        // Fall back to DEFAULT_SETTINGS silently; UI still works
         setSettings(DEFAULT_SETTINGS)
       } finally {
         setSettingsLoading(false)
@@ -108,7 +104,6 @@ const PlayerPage: React.FC = () => {
 
     loadSettings()
   }, [])
-// Auto-refresh settings every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetch('/api/settings/player')
@@ -118,12 +113,11 @@ const PlayerPage: React.FC = () => {
             setSettings(prev => ({ ...prev, ...serverSettings }))
           })
           .catch(err => console.error('Auto-refresh failed:', err))
-    }, 30000) // 30 seconds
+    }, 30000)
 
     return () => clearInterval(interval)
   }, [])
 
-  // Helper: operating hours based on settings.startTime / settings.endTime
   const isWithinOperatingHours = useCallback(() => {
     const { startTime, endTime } = effectiveSettings
 
@@ -136,10 +130,6 @@ const PlayerPage: React.FC = () => {
     const nowMinutes = now.getHours() * 60 + now.getMinutes()
     const start = parseHHMM(startTime)
     const end = parseHHMM(endTime)
-
-    // Handle normal and overnight windows:
-    // - normal: start <= end  -> [start, end)
-    // - overnight: start > end -> [start, 24h) U [0, end
     if (start <= end) {
       return nowMinutes >= start && nowMinutes < end
     } else {
@@ -147,7 +137,6 @@ const PlayerPage: React.FC = () => {
     }
   }, [effectiveSettings])
 
-  // Load photos once settings (activeAlbum, maxImages) are known
   useEffect(() => {
     const loadPhotos = async () => {
       try {
@@ -185,7 +174,6 @@ const PlayerPage: React.FC = () => {
       }
     }
 
-    // Wait until we’ve at least tried loading settings
     if (!settingsLoading) {
       loadPhotos()
     }
