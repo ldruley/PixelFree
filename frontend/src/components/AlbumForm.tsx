@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useCombobox } from 'downshift';
 import type { Album, CreateAlbumRequest } from '../services/albumService';
+import { getTagSuggestions } from '../utils/commonTags';
+import { wordDictionary } from '../utils/wordDictionary';
+import '../styles/AppLayout.css';
 
 interface AlbumFormProps {
   album?: Album | null; // If editing, pass existing album
@@ -25,6 +29,75 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
   // State for tag chips
   const [tagChips, setTagChips] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  
+  // Get hybrid tag suggestions (curated + dictionary)
+  const { suggestions, curatedCount } = useMemo(() => {
+    if (!tagInput.trim()) return { suggestions: [], curatedCount: 0 };
+    
+    // Get curated photography tags (prioritized)
+    const curatedTags = getTagSuggestions(tagInput, tagChips);
+    
+    // Get additional words from trie dictionary
+    const searchTerm = tagInput.toLowerCase().trim().replace(/^#/, '');
+    const dictionaryWords = wordDictionary.search(searchTerm)
+      .filter(word => !tagChips.includes(word)) // Exclude already added
+      .filter(word => !curatedTags.includes(word)); // Exclude duplicates from curated
+    
+    // Combine: curated tags first (max 10), then dictionary words (remaining slots)
+    const maxCurated = 10;
+    const maxTotal = 20;
+    const topCurated = curatedTags.slice(0, maxCurated);
+    const remainingSlots = maxTotal - topCurated.length;
+    const additionalWords = dictionaryWords.slice(0, remainingSlots);
+    
+    return {
+      suggestions: [...topCurated, ...additionalWords],
+      curatedCount: topCurated.length,
+    };
+  }, [tagInput, tagChips]);
+  
+  // Downshift combobox for autocomplete
+  const {
+    isOpen,
+    getMenuProps,
+    getInputProps,
+    highlightedIndex,
+    getItemProps,
+    reset,
+  } = useCombobox({
+    items: suggestions,
+    inputValue: tagInput,
+    onInputValueChange: ({ inputValue }) => {
+      setTagInput(inputValue || '');
+    },
+    onSelectedItemChange: ({ selectedItem }) => {
+      if (selectedItem && !tagChips.includes(selectedItem)) {
+        setTagChips([...tagChips, selectedItem]);
+        setValidationError(null);
+        // Clear input and reset combobox
+        setTagInput('');
+        reset();
+      }
+    },
+    itemToString: (item) => item || '',
+  });
+  
+  // Helper to highlight matching text
+  const highlightMatch = (tag: string, search: string) => {
+    const searchTerm = search.toLowerCase().trim().replace(/^#/, '');
+    const tagLower = tag.toLowerCase();
+    const index = tagLower.indexOf(searchTerm);
+    
+    if (index === -1) return tag;
+    
+    const before = tag.slice(0, index);
+    const match = tag.slice(index, index + searchTerm.length);
+    const after = tag.slice(index + searchTerm.length);
+    
+    return (
+      <span>{before}<strong>{match}</strong>{after}</span>
+    );
+  };
 
   // Populate form when editing
   useEffect(() => {
@@ -44,8 +117,13 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
     }
   }, [album]);
 
-  // Handle adding a tag chip
+  // Handle adding a tag chip manually
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Don't add on Enter if there are suggestions (let Downshift handle it)
+    if (e.key === 'Enter' && suggestions.length > 0) {
+      return;
+    }
+    
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
       const tag = tagInput.trim().replace(/^#/, '');
@@ -151,7 +229,7 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
           )}
 
           {/* Album Name */}
-          <div className="form-group">
+          <div className="form-group form-group-full">
             <label htmlFor="name">
               Album Name <span className="required">*</span>
             </label>
@@ -188,36 +266,61 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
 
           {/* Tags */}
           {(formData.queryType === 'tag' || formData.queryType === 'compound') && (
-            <div className="form-group">
+            <div className="form-group form-group-full">
               <label htmlFor="tags">
                 Tags <span className="required">*</span>
               </label>
-              <div className="tag-chips-container">
-                {tagChips.map(tag => (
-                  <div key={tag} className="tag-chip">
-                    <span>#{tag}</span>
-                    <button
-                      type="button"
-                      className="tag-chip-remove"
-                      onClick={() => handleRemoveTag(tag)}
-                      aria-label={`Remove ${tag}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <input
-                  type="text"
-                  id="tags"
-                  className="tag-input"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleAddTag}
-                  placeholder={tagChips.length === 0 ? "Type a tag and press Enter" : "Add another..."}
-                />
+              <div className="tag-autocomplete-wrapper">
+                <div className="tag-chips-container">
+                  {tagChips.map(tag => (
+                    <div key={tag} className="tag-chip">
+                      <span>#{tag}</span>
+                      <button
+                        type="button"
+                        className="tag-chip-remove"
+                        onClick={() => handleRemoveTag(tag)}
+                        aria-label={`Remove ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <input
+                    {...getInputProps({
+                      type: "text",
+                      id: "tags",
+                      className: "tag-input",
+                      placeholder: tagChips.length === 0 ? "Type a tag and press Enter" : "Add another...",
+                      onKeyDown: handleAddTag,
+                    })}
+                  />
+                </div>
+                
+                {/* Autocomplete Dropdown */}
+                {isOpen && tagInput.trim() && suggestions.length > 0 && (
+                  <ul {...getMenuProps()} className="tag-suggestions">
+                    {suggestions.map((item, index) => (
+                      <React.Fragment key={item}>
+                        {/* Add divider between curated and dictionary suggestions */}
+                        {index === curatedCount && curatedCount > 0 && curatedCount < suggestions.length && (
+                          <li className="tag-suggestions-divider">
+                            <span>More suggestions</span>
+                          </li>
+                        )}
+                        <li
+                          {...getItemProps({ item, index })}
+                          className={`tag-suggestion-item ${highlightedIndex === index ? 'highlighted' : ''}`}
+                        >
+                          <span className="suggestion-hash">#</span>
+                          {highlightMatch(item, tagInput)}
+                        </li>
+                      </React.Fragment>
+                    ))}
+                  </ul>
+                )}
               </div>
               <small className="help-text">
-                Type a tag (without #) and press Enter or comma to add
+                Type to see suggestions, press Enter or comma to add custom tags
               </small>
             </div>
           )}
@@ -239,7 +342,7 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
 
           {/* Users */}
           {(formData.queryType === 'user' || formData.queryType === 'compound') && (
-            <div className="form-group">
+            <div className="form-group form-group-full">
               <label htmlFor="users">
                 Users <span className="required">*</span>
               </label>
@@ -293,7 +396,7 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
           </div>
 
           {/* Enabled */}
-          <div className="form-group checkbox-group">
+          <div className="form-group form-group-full checkbox-group">
             <label>
               <input
                 type="checkbox"
@@ -326,247 +429,6 @@ const AlbumForm: React.FC<AlbumFormProps> = ({ album, onSave, onCancel }) => {
             </button>
           </div>
         </form>
-
-        <style>{`
-          .album-form-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-          }
-
-          .album-form-container {
-            background: white;
-            border-radius: 12px;
-            max-width: 600px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-          }
-
-          .album-form-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 24px;
-            border-bottom: 1px solid #e0e0e0;
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 1;
-          }
-
-          .album-form-header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: #333;
-          }
-
-          .close-button {
-            background: none;
-            border: none;
-            font-size: 2rem;
-            color: #999;
-            cursor: pointer;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.2s;
-          }
-
-          .close-button:hover {
-            background: #f0f0f0;
-            color: #333;
-          }
-
-          .album-form {
-            padding: 24px;
-          }
-
-          .validation-error {
-            padding: 12px 16px;
-            background: #ffebee;
-            border: 1px solid #ef5350;
-            border-radius: 6px;
-            color: #c62828;
-            margin-bottom: 20px;
-            font-size: 0.875rem;
-          }
-
-          .form-group {
-            margin-bottom: 20px;
-          }
-
-          .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #333;
-            font-size: 0.9rem;
-          }
-
-          .required {
-            color: #f44336;
-          }
-
-          .form-group input[type="text"],
-          .form-group input[type="number"],
-          .form-group select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            transition: border-color 0.2s;
-            box-sizing: border-box;
-          }
-
-          .form-group input:focus,
-          .form-group select:focus {
-            outline: none;
-            border-color: #2196F3;
-            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-          }
-
-          .help-text {
-            display: block;
-            margin-top: 6px;
-            font-size: 0.8rem;
-            color: #666;
-          }
-
-          .checkbox-group label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-weight: normal;
-          }
-
-          .checkbox-group input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-          }
-
-          .tag-chips-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            min-height: 45px;
-            align-items: center;
-            background: white;
-          }
-
-          .tag-chips-container:focus-within {
-            border-color: #2196F3;
-            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-          }
-
-          .tag-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px 4px 10px;
-            background: #2196F3;
-            color: white;
-            border-radius: 16px;
-            font-size: 0.875rem;
-            font-weight: 500;
-          }
-
-          .tag-chip-remove {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 1.25rem;
-            line-height: 1;
-            padding: 0;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: background 0.2s;
-          }
-
-          .tag-chip-remove:hover {
-            background: rgba(255, 255, 255, 0.2);
-          }
-
-          .tag-input {
-            flex: 1;
-            min-width: 120px;
-            border: none;
-            outline: none;
-            padding: 4px;
-            font-size: 0.95rem;
-          }
-
-          .tag-input::placeholder {
-            color: #999;
-          }
-
-          .form-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-          }
-
-          .btn {
-            padding: 10px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: all 0.2s;
-          }
-
-          .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-
-          .btn-cancel {
-            background: #f0f0f0;
-            color: #333;
-          }
-
-          .btn-cancel:hover:not(:disabled) {
-            background: #e0e0e0;
-          }
-
-          .btn-primary {
-            background: #2196F3;
-            color: white;
-          }
-
-          .btn-primary:hover:not(:disabled) {
-            background: #1976D2;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
-          }
-        `}</style>
       </div>
     </div>
   );

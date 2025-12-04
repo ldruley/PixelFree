@@ -94,10 +94,71 @@ export async function handleCallback(query) {
   return { ok: true };
 }
 
-export function getStatus() {
+export async function getStatus() {
   const t = readToken();
-  if (!t) return { authenticated: false };
+  if (!t) return { isAuthenticated: false };
+  
   const expiresAt = t.created_at + t.expires_in;
+  const now = Math.floor(Date.now() / 1000);
+  
+  // Check if token is expired
+  if (now >= expiresAt) {
+    return { isAuthenticated: false };
+  }
+  
+  // Fetch user profile from Pixelfed
+  let timeout;
+  try {
+    const token = await getAccessToken();
+    const { instanceUrl } = cfg();
+    
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const res = await fetch(new URL('/api/v1/accounts/verify_credentials', instanceUrl), {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      signal: controller.signal
+    });
+    
+    if (res.ok) {
+      const user = await res.json();
+      return { 
+        isAuthenticated: true, 
+        expiresAt,
+        user: {
+          id: user.id,
+          username: user.username,
+          acct: user.acct,
+          display_name: user.display_name || user.username,
+          avatar: user.avatar,
+          header: user.header,
+          note: user.note,
+          url: user.url,
+          followers_count: user.followers_count,
+          following_count: user.following_count,
+          statuses_count: user.statuses_count,
+          created_at: user.created_at
+        }
+      };
+    } else {
+      console.warn(`Failed to fetch user profile: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    const errMsg = err.message || String(err);
+    if (errMsg.includes('abort')) {
+      console.warn('User profile fetch timed out');
+    } else {
+      console.error('Failed to fetch user profile:', errMsg);
+    }
+    // Still return authenticated if we have a valid token, just without user details
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+  
+  // Return authenticated without user details if profile fetch failed
   return { isAuthenticated: true, expiresAt };
 }
 

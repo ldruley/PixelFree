@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getAlbum, getAlbumPhotos, type Album } from '../services/albumService';
+import { getAlbum, getAlbumPhotos, updateAlbum, type Album } from '../services/albumService';
 import { addFavorite, removeFavorite, batchCheckFavorites } from '../services/favoritesService';
 import type { Photo } from '../services/photoService';
+import { FiCheck, FiHeart, FiInfo, FiX, FiEyeOff, FiTag, FiPlus, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import Loading from '../components/Loading';
+import { showError, showSuccess, showInfo } from '../utils/toast';
+import { stripHtml, loadAllPages } from '../utils/helpers';
+import { APP_CONFIG } from '../config';
+import '../styles/AppLayout.css';
 
 const AlbumGalleryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,17 +18,40 @@ const AlbumGalleryPage: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
-  const [total, setTotal] = useState(0);
+  const [showPhotoInfo, setShowPhotoInfo] = useState(true);
+  
+  // Tag Editing
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  const [albumTags, setAlbumTags] = useState<string[]>([]);
 
-  // Helper function to strip HTML tags from caption
-  const stripHtml = (html: string | undefined): string => {
-    if (!html) return '';
-    const tmp = document.createElement('DIV');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
+  // Selection Mode
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+
+  // Define callbacks first (before useEffects that use them)
+  const handleCloseModal = useCallback(() => {
+    setSelectedPhoto(null);
+  }, []);
+
+  const handleNextPhoto = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!selectedPhoto || photos.length === 0) return;
+    
+    const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id);
+    const nextIndex = (currentIndex + 1) % photos.length;
+    setSelectedPhoto(photos[nextIndex]);
+  }, [selectedPhoto, photos]);
+
+  const handlePrevPhoto = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!selectedPhoto || photos.length === 0) return;
+    
+    const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id);
+    const prevIndex = (currentIndex - 1 + photos.length) % photos.length;
+    setSelectedPhoto(photos[prevIndex]);
+  }, [selectedPhoto, photos]);
 
   useEffect(() => {
     if (id) {
@@ -30,31 +59,51 @@ const AlbumGalleryPage: React.FC = () => {
     }
   }, [id]);
 
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedPhoto) return;
+      
+      if (e.key === 'ArrowLeft') {
+        handlePrevPhoto();
+      } else if (e.key === 'ArrowRight') {
+        handleNextPhoto();
+      } else if (e.key === 'Escape') {
+        handleCloseModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPhoto, handlePrevPhoto, handleNextPhoto, handleCloseModal]);
+
   const loadAlbumAndPhotos = async () => {
     if (!id) return;
 
     try {
       setIsLoading(true);
-      setError(null);
 
-      // Load album details and photos in parallel
-      const [albumData, photosData] = await Promise.all([
-        getAlbum(id),
-        getAlbumPhotos(id, { limit: 100 })
-      ]);
-
+      // Load album details first
+      const albumData = await getAlbum(id);
       setAlbum(albumData);
-      setPhotos(photosData.items);
-      setTotal(photosData.total);
+      setAlbumTags(albumData.query.tags || []);
 
+      // Fetch all photos with progressive loading and max limit
+      const allPhotos = await loadAllPages<Photo>(
+        (params) => getAlbumPhotos(id, params),
+        100,
+        (photos) => setPhotos(photos), // Update UI progressively as batches load
+        APP_CONFIG.MAX_ALBUM_PHOTOS     // Max 1000 photos
+      );
+      
       // Batch check favorite status for all photos
-      if (photosData.items.length > 0) {
-        const statusIds = photosData.items.map(p => p.id);
+      if (allPhotos.length > 0) {
+        const statusIds = allPhotos.map(p => p.id);
         const favStatus = await batchCheckFavorites(statusIds);
         setFavorites(favStatus);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load album');
+      showError(err instanceof Error ? err.message : 'Failed to load album');
       console.error('Error loading album:', err);
     } finally {
       setIsLoading(false);
@@ -77,39 +126,93 @@ const AlbumGalleryPage: React.FC = () => {
         setFavorites(prev => ({ ...prev, [photo.id]: true }));
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update favorite');
+      showError(err instanceof Error ? err.message : 'Failed to update favorite');
     }
   };
 
   const handlePhotoClick = (photo: Photo) => {
-    setSelectedPhoto(photo);
+    if (isSelectionMode) {
+      const newSelected = new Set(selectedPhotoIds);
+      if (newSelected.has(photo.id)) {
+        newSelected.delete(photo.id);
+      } else {
+        newSelected.add(photo.id);
+      }
+      setSelectedPhotoIds(newSelected);
+    } else {
+      setSelectedPhoto(photo);
+      setShowPhotoInfo(true);
+    }
   };
 
-  const handleCloseModal = () => {
-    setSelectedPhoto(null);
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedPhotoIds(new Set());
   };
 
-  const handleBack = () => {
-    navigate('/albums');
+  const handleDeleteSelected = async () => {
+    showInfo("Delete functionality not implemented yet for photos.");
+  };
+
+  // Album Tag Management
+  const handleAddTag = async () => {
+    if (!newTag.trim() || !album) return;
+    
+    const updatedTags = [...albumTags, newTag.trim()];
+    setAlbumTags(updatedTags);
+    setNewTag('');
+    
+    try {
+      await updateAlbum(album.id, {
+        query: {
+          ...album.query,
+          tags: updatedTags
+        }
+      });
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+      // Revert on failure
+      setAlbumTags(albumTags);
+      showError('Failed to update tags');
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove: string) => {
+    if (!album) return;
+    
+    const updatedTags = albumTags.filter(t => t !== tagToRemove);
+    setAlbumTags(updatedTags);
+    
+    try {
+      await updateAlbum(album.id, {
+        query: {
+          ...album.query,
+          tags: updatedTags
+        }
+      });
+      showSuccess('Tag removed');
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+      setAlbumTags(albumTags);
+      showError('Failed to update tags');
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="page-container">
-        <div className="empty-state">
-          Loading album...
-        </div>
+      <div className="app-content">
+        <Loading />
       </div>
     );
   }
 
-  if (error || !album) {
+  if (!album) {
     return (
-      <div className="page-container">
+      <div className="app-content">
         <div className="error-banner">
-          {error || 'Album not found'}
+          Album not found
         </div>
-        <button className="btn btn-secondary" onClick={handleBack}>
+        <button className="btn btn-secondary" onClick={() => navigate('/albums')}>
           ← Back to Albums
         </button>
       </div>
@@ -117,242 +220,191 @@ const AlbumGalleryPage: React.FC = () => {
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <button className="back-button" onClick={handleBack}>
-            ← Back
+    <div className="app-content">
+      <div className="page-header-actions">
+        <h1 className="app-page-title">
+          <span 
+            onClick={() => navigate('/albums')} 
+            className="breadcrumb-nav"
+          >
+            Albums
+          </span>
+          <span className="breadcrumb-separator">/</span>
+          <span>{album.name}</span>
+        </h1>
+        <button className="action-btn" onClick={toggleSelectionMode}>
+          {isSelectionMode ? 'Done' : 'Select'}
+        </button>
+      </div>
+
+      {/* Album Tags / Query Section */}
+      <div className="album-query-section">
+        <div className="album-tags-header">
+          <h3 className="album-tags-title">
+            Album Tags
+          </h3>
+          <button 
+            className="action-btn action-btn-small"
+            onClick={() => setIsEditingTags(!isEditingTags)}
+          >
+            {isEditingTags ? 'Done' : 'Edit'}
           </button>
-          <h1 className="page-title">{album.name}</h1>
-          <p className="page-subtitle">
-            {total} photo{total !== 1 ? 's' : ''}
-          </p>
         </div>
+        
+        <div className="query-tags-container">
+          {albumTags.map((tag) => (
+            <div key={tag} className="query-tag">
+              <FiTag size={14} />
+              <span>#{tag}</span>
+              {isEditingTags && (
+                <FiX 
+                  size={14} 
+                  className="icon-clickable"
+                  onClick={() => handleRemoveTag(tag)}
+                />
+              )}
+            </div>
+          ))}
+          {albumTags.length === 0 && !isEditingTags && (
+            <span className="no-tags-text">No tags set</span>
+          )}
+        </div>
+
+        {isEditingTags && (
+          <div className="tag-input-wrapper">
+            <input
+              type="text"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+              placeholder="Add a tag..."
+              className="tag-input"
+            />
+            <button className="add-tag-btn" onClick={handleAddTag}>
+              <FiPlus size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {photos.length === 0 ? (
         <div className="empty-state">
           <p className="empty-state-message">No photos in this album yet</p>
-          <p className="empty-state-description">
-            Try refreshing the album to fetch new photos
-          </p>
         </div>
       ) : (
-        <div className="gallery-grid">
+        <div className="albums-grid-container">
           {photos.map((photo) => (
-            <div key={photo.id} className="gallery-card">
-              <div className="gallery-image-container" onClick={() => handlePhotoClick(photo)}>
+            <div key={photo.id} className="album-card" onClick={() => handlePhotoClick(photo)}>
+              <div className="album-card-image">
                 <img
                   src={photo.preview_url || photo.url}
                   alt={photo.caption || 'Photo'}
                   className="gallery-image"
+                  onError={(e) => {
+                    e.currentTarget.src = '/playerlogo.png';
+                    e.currentTarget.classList.add('img-error-fallback');
+                  }}
                 />
-                <div className="gallery-overlay">
-                  <button
-                    className={`favorite-btn ${favorites[photo.id] ? 'favorited' : ''}`}
-                    onClick={(e) => handleToggleFavorite(photo, e)}
-                    title={favorites[photo.id] ? 'Remove from favorites' : 'Add to favorites'}
+                
+                {isSelectionMode && (
+                  <div 
+                    className={`selection-checkbox ${selectedPhotoIds.has(photo.id) ? 'selected' : ''}`}
                   >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill={favorites[photo.id] ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  </button>
-                </div>
+                    {selectedPhotoIds.has(photo.id) && <FiCheck size={14} />}
+                  </div>
+                )}
               </div>
-              {photo.caption && (
-                <div className="gallery-caption">
-                  {stripHtml(photo.caption).substring(0, 60)}{stripHtml(photo.caption).length > 60 ? '...' : ''}
-                </div>
-              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Photo Detail Modal */}
+      {/* Bottom Action Bar (Selection Mode) */}
+      {isSelectionMode && (
+        <div className="bottom-action-bar">
+          <button className="pill-btn cancel" onClick={toggleSelectionMode}>
+            Cancel
+          </button>
+          {selectedPhotoIds.size > 0 && (
+            <button className="pill-btn delete" onClick={handleDeleteSelected}>
+              Delete ({selectedPhotoIds.size})
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* New Clean Photo Modal */}
       {selectedPhoto && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content photo-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={handleCloseModal}>×</button>
-            <div className="photo-modal-content">
+        <div className="photo-modal-overlay" onClick={handleCloseModal}>
+          <div className="photo-modal-container" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" onClick={handleCloseModal} title="Close">
+              <FiX />
+            </button>
+
+            {/* Navigation Buttons */}
+            <button className="modal-nav-btn left" onClick={handlePrevPhoto} title="Previous Photo">
+              <FiChevronLeft size={24} />
+            </button>
+            
+            <button className="modal-nav-btn right" onClick={handleNextPhoto} title="Next Photo">
+              <FiChevronRight size={24} />
+            </button>
+
+            <div className="photo-modal-image-wrapper">
               <img
                 src={selectedPhoto.url}
                 alt={selectedPhoto.caption || 'Photo'}
                 className="photo-modal-image"
+                onError={(e) => {
+                  e.currentTarget.src = '/playerlogo.png';
+                  e.currentTarget.classList.add('img-error-fallback-large');
+                }}
               />
-              <div className="photo-modal-details">
-                {selectedPhoto.caption && (
-                  <p className="photo-modal-caption">{stripHtml(selectedPhoto.caption)}</p>
-                )}
-                {selectedPhoto.author_display_name && (
-                  <p className="photo-modal-author">by {selectedPhoto.author_display_name}</p>
-                )}
-                <button
-                  className={`btn ${favorites[selectedPhoto.id] ? 'btn-danger' : 'btn-primary'}`}
-                  onClick={() => handleToggleFavorite(selectedPhoto)}
-                >
-                  {favorites[selectedPhoto.id] ? '♥ Remove from Favorites' : '♡ Add to Favorites'}
-                </button>
-              </div>
+              
+              {showPhotoInfo && (selectedPhoto.caption || selectedPhoto.author_display_name) && (
+                <div className="photo-info-overlay">
+                  {selectedPhoto.caption && (
+                    <p className="photo-info-caption">{stripHtml(selectedPhoto.caption)}</p>
+                  )}
+                  {selectedPhoto.author_display_name && (
+                    <div className="photo-info-author">
+                      <span>by {selectedPhoto.author_display_name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="photo-modal-controls">
+              <button 
+                className={`control-btn ${favorites[selectedPhoto.id] ? 'favorite-active' : ''}`}
+                onClick={() => handleToggleFavorite(selectedPhoto)}
+                title="Favorite"
+              >
+                <FiHeart fill={favorites[selectedPhoto.id] ? "currentColor" : "none"} size={20} />
+              </button>
+              
+              <button 
+                className={`control-btn ${showPhotoInfo ? 'active' : ''}`}
+                onClick={() => setShowPhotoInfo(!showPhotoInfo)}
+                title="Show Info"
+              >
+                <FiInfo size={20} />
+              </button>
+
+              <button 
+                className="control-btn"
+                onClick={handleCloseModal}
+                title="Hide"
+              >
+                <FiEyeOff size={20} />
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        .back-button {
-          background: none;
-          border: none;
-          color: #2196F3;
-          font-size: 0.95rem;
-          cursor: pointer;
-          padding: 8px 0;
-          margin-bottom: 8px;
-          display: inline-block;
-          transition: color 0.2s;
-        }
-
-        .back-button:hover {
-          color: #1976D2;
-          text-decoration: underline;
-        }
-
-        .gallery-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-          gap: 20px;
-          padding: 20px 0;
-        }
-
-        .gallery-card {
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .gallery-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-        }
-
-        .gallery-image-container {
-          position: relative;
-          aspect-ratio: 1;
-          overflow: hidden;
-          cursor: pointer;
-          background: #f0f0f0;
-        }
-
-        .gallery-image {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          transition: transform 0.3s;
-        }
-
-        .gallery-image-container:hover .gallery-image {
-          transform: scale(1.05);
-        }
-
-        .gallery-overlay {
-          position: absolute;
-          top: 0;
-          right: 0;
-          padding: 12px;
-          opacity: 0;
-          transition: opacity 0.2s;
-        }
-
-        .gallery-card:hover .gallery-overlay {
-          opacity: 1;
-        }
-
-        .favorite-btn {
-          background: rgba(255, 255, 255, 0.9);
-          color: #666;
-          border: none;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
-        .favorite-btn:hover {
-          background: white;
-          transform: scale(1.1);
-        }
-
-        .favorite-btn.favorited {
-          color: #f44336;
-          background: white;
-        }
-
-        .favorite-btn.favorited:hover {
-          color: #d32f2f;
-        }
-
-        .gallery-caption {
-          padding: 12px;
-          font-size: 0.875rem;
-          color: #333;
-          line-height: 1.4;
-        }
-
-        .photo-modal {
-          max-width: 90vw;
-          max-height: 90vh;
-          padding: 0;
-          overflow: hidden;
-        }
-
-        .photo-modal-content {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-        }
-
-        .photo-modal-image {
-          flex: 1;
-          width: 100%;
-          object-fit: contain;
-          background: #000;
-        }
-
-        .photo-modal-details {
-          padding: 20px;
-          background: white;
-          border-top: 1px solid #e0e0e0;
-        }
-
-        .photo-modal-caption {
-          margin: 0 0 8px 0;
-          font-size: 1rem;
-          color: #333;
-        }
-
-        .photo-modal-author {
-          margin: 0 0 16px 0;
-          font-size: 0.875rem;
-          color: #666;
-        }
-
-        @media (max-width: 768px) {
-          .gallery-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-          }
-        }
-      `}</style>
     </div>
   );
 };
 
 export default AlbumGalleryPage;
-

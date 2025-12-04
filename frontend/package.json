@@ -10,17 +10,19 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "vite": "^7.1.7"
   },
   "dependencies": {
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "an-array-of-english-words": "^2.0.0",
+    "downshift": "^9.0.8",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.2"
+    "react-hot-toast": "^2.4.1",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.9.2",
+    "trie-search": "^1.4.1"
   }
 }

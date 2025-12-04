@@ -4,9 +4,18 @@
 export interface AuthStatus {
   isAuthenticated: boolean;
   user?: {
+    id?: string;
     username?: string;
+    acct?: string;
     display_name?: string;
     avatar?: string;
+    header?: string;
+    note?: string;
+    url?: string;
+    followers_count?: number;
+    following_count?: number;
+    statuses_count?: number;
+    created_at?: string;
   };
 }
 
@@ -14,15 +23,15 @@ export interface LoginResponse {
   loginUrl: string;
 }
 
-// Use relative URLs - Vite proxy will handle routing to backend
-const API_BASE = '';
+// Import centralized API configuration
+import { API_CONFIG } from '../config';
 
 /**
  * Check current authentication status
  */
 export const checkAuthStatus = async (): Promise<AuthStatus> => {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/status`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/status`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -38,7 +47,7 @@ export const checkAuthStatus = async (): Promise<AuthStatus> => {
  */
 export const getLoginUrl = async (): Promise<string> => {
   try {
-    const response = await fetch(`${API_BASE}/api/login`);
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/login`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -55,7 +64,7 @@ export const getLoginUrl = async (): Promise<string> => {
  */
 export const logout = async (): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/api/auth/logout`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

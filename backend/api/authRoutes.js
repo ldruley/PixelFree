@@ -25,10 +25,11 @@ export default function mountAuthRoutes(app) {
   }));
 
   // GET /api/auth/status → return current auth status JSON
-  router.get('/auth/status', (_req, res) => {
+  router.get('/auth/status', wrap(async (_req, res) => {
     console.log('[API] GET /api/auth/status');
-    res.json(auth.getStatus());
-  });
+    const status = await auth.getStatus();
+    res.json(status);
+  }));
 
   // POST /api/auth/logout → clear token, return { ok: true }
   router.post('/auth/logout', (_req, res) => {

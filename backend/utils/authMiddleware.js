@@ -14,12 +14,17 @@ import * as auth from '../modules/auth.js';
  * Middleware: allow request to proceed only if authenticated.
  * Otherwise respond with HTTP 401 and a small JSON error payload.
  */
-export function ensureAuthed(req, res, next) {
-  const status = auth.getStatus?.();
-  if (status?.isAuthenticated) {
-    return next();
+export async function ensureAuthed(req, res, next) {
+  try {
+    const status = await auth.getStatus?.();
+    if (status?.isAuthenticated) {
+      return next();
+    }
+    return res.status(401).json({ error: 'Not authenticated' });
+  } catch (err) {
+    console.error('Auth check failed:', err);
+    return res.status(401).json({ error: 'Authentication check failed' });
   }
-  return res.status(401).json({ error: 'Not authenticated' });
 }
 
 /**
@@ -27,15 +32,20 @@ export function ensureAuthed(req, res, next) {
  * otherwise redirect to login flow. Useful for web UI routes,
  * but not typically for API endpoints.
  */
-export function redirectIfNotAuthed(req, res, next) {
-  const status = auth.getStatus?.();
-  if (status?.isAuthenticated) {
-    return next();
+export async function redirectIfNotAuthed(req, res, next) {
+  try {
+    const status = await auth.getStatus?.();
+    if (status?.isAuthenticated) {
+      return next();
+    }
+    // Send back to frontend or trigger OAuth login page
+    const loginUrl = auth.getLoginUrl?.();
+    if (loginUrl) {
+      return res.redirect(loginUrl);
+    }
+    return res.status(401).json({ error: 'Not authenticated' });
+  } catch (err) {
+    console.error('Auth redirect check failed:', err);
+    return res.status(401).json({ error: 'Authentication check failed' });
   }
-  // Send back to frontend or trigger OAuth login page
-  const loginUrl = auth.getLoginUrl?.();
-  if (loginUrl) {
-    return res.redirect(loginUrl);
-  }
-  return res.status(401).json({ error: 'Not authenticated' });
 }

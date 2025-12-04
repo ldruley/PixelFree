@@ -35,14 +35,15 @@ export interface FavoritesListResponse {
   limit: number;
 }
 
-const API_BASE = ''; // Use relative URLs - Vite proxy handles routing
+// Import centralized API configuration
+import { API_CONFIG } from '../config';
 
 /**
  * Add a photo to favorites
  */
 export const addFavorite = async (statusId: string, note?: string): Promise<FavoriteStatus> => {
   try {
-    const response = await fetch(`${API_BASE}/api/favorites/${statusId}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/favorites/${statusId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export const addFavorite = async (statusId: string, note?: string): Promise<Favo
  */
 export const removeFavorite = async (statusId: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/api/favorites/${statusId}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/favorites/${statusId}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -90,7 +91,7 @@ export const removeFavorite = async (statusId: string): Promise<void> => {
  */
 export const getFavoriteStatus = async (statusId: string): Promise<FavoriteStatus> => {
   try {
-    const response = await fetch(`${API_BASE}/api/favorites/${statusId}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/favorites/${statusId}`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -111,7 +112,7 @@ export const getFavoriteStatus = async (statusId: string): Promise<FavoriteStatu
  */
 export const batchCheckFavorites = async (statusIds: string[]): Promise<Record<string, boolean>> => {
   try {
-    const response = await fetch(`${API_BASE}/api/favorites/batch/check`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/favorites/batch/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -144,7 +145,7 @@ export const listFavorites = async (options: {
     if (options.offset != null) params.set('offset', String(options.offset));
     if (options.limit != null) params.set('limit', String(options.limit));
 
-    const response = await fetch(`${API_BASE}/api/favorites?${params.toString()}`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/favorites?${params.toString()}`, {
       method: 'GET',
       credentials: 'include',
     });

@@ -1,47 +1,50 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { showError } from '../utils/toast'
+import '../styles/AppLayout.css'
 
 const LoginPage: React.FC = () => {
-  const { authStatus, isLoading, login } = useAuth()
+  const { authStatus, isLoading, login, refreshAuthStatus } = useAuth()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [showSuccess, setShowSuccess] = useState(false)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Check for authentication success parameter
   useEffect(() => {
-    if (searchParams.get('auth') === 'success') {
-      setShowSuccess(true)
-      // Remove the auth parameter from URL
-      setSearchParams({})
-      // Hide success message after 5 seconds, then redirect
-      setTimeout(() => {
-        setShowSuccess(false)
-        if (authStatus.isAuthenticated) {
-          navigate('/albums')
-        }
-      }, 5000)
+    const handleAuthSuccess = async () => {
+      if (searchParams.get('auth') === 'success') {
+        setShowSuccess(true)
+        setSearchParams({})
+        
+        await refreshAuthStatus(false)
+        
+        setTimeout(() => {
+          setShowSuccess(false)
+          navigate('/albums', { replace: true })
+        }, 1500)
+      }
     }
-  }, [searchParams, setSearchParams, authStatus.isAuthenticated, navigate])
+    
+    handleAuthSuccess()
+  }, [])
 
-  // Redirect if already authenticated (but not if showing success message - this will take user to album for more guided flow  )
+  // Redirect if already authenticated (but not if showing success message)
   useEffect(() => {
     if (authStatus.isAuthenticated && !showSuccess) {
-      navigate('/albums')
+      navigate('/albums', { replace: true })
     }
   }, [authStatus.isAuthenticated, navigate, showSuccess])
 
   const handleLogin = async () => {
     try {
       setIsLoggingIn(true)
-      setError(null)
       await login()
       // Note: login() will redirect to Pixelfed, so we won't reach this point
       // unless there's an error
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
+      showError(err instanceof Error ? err.message : 'Login failed. Please try again.')
       setIsLoggingIn(false)
     }
   }
@@ -88,12 +91,6 @@ const LoginPage: React.FC = () => {
           >
             {isLoggingIn ? 'Connecting...' : 'Connect to Pixelfed'}
           </button>
-          
-          {error && (
-            <div className="form-error">
-              {error}
-            </div>
-          )}
           
           <p className="form-help-text help-text-centered">
             You'll be redirected to Pixelfed to authorize PixelFree.
