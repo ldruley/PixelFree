@@ -2,14 +2,48 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Photo } from '../services/photoService'
 import { getAlbumPhotos, listAlbums } from '../services/albumService'
-import { useSettings } from '../contexts/SettingsContext'
 import Header from '../components/Header'
 import '../styles/player.css'
+
 const TRANSITION_MS = 1200
+
+type PlayerLayout = 'single' | 'grid' | 'split'
+type PlayerTransition = 'none' | 'fade' | 'slide'
+type PlayerOrder = 'fixed' | 'shuffle'
+type PlayerBackground = 'black' | 'gradient' | 'blur'
+
+type PlayerSettings = {
+  layout: PlayerLayout
+  transition: PlayerTransition
+  timing: string
+  order: PlayerOrder
+  startTime: string 
+  endTime: string   
+  maxImages: number
+  recencyWindow: number
+  activeAlbum: string
+  background?: PlayerBackground
+}
+
+const DEFAULT_SETTINGS: PlayerSettings = {
+  layout: 'single',
+  transition: 'fade',
+  timing: '10s',
+  order: 'shuffle',
+  startTime: '08:00',
+  endTime: '22:00',
+  maxImages: 100,
+  recencyWindow: 30,
+  activeAlbum: 'favorites',
+  background: 'black'
+}
 
 const PlayerPage: React.FC = () => {
   const navigate = useNavigate()
-  const { settings, isWithinOperatingHours } = useSettings()
+
+  const [settings, setSettings] = useState<PlayerSettings>(DEFAULT_SETTINGS)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+
   const [photos, setPhotos] = useState<Photo[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [shuffledIndices, setShuffledIndices] = useState<number[]>([])
@@ -21,6 +55,8 @@ const PlayerPage: React.FC = () => {
   const [nextIndex, setNextIndex] = useState<number | null>(null)
   const [direction] = useState<'left' | 'right'>('left')
   const [nextReady, setNextReady] = useState(false)
+
+  const effectiveSettings = settings || DEFAULT_SETTINGS
 
   const shuffleArray = (array: number[]): number[] => {
     const shuffled = [...array]
@@ -40,7 +76,66 @@ const PlayerPage: React.FC = () => {
     const ms = unit === 'm' ? value * 60_000 : value * 1_000
     return Math.max(1000, ms)
   }
-  const intervalMs = parseTimingMs(settings?.timing)
+
+  const intervalMs = parseTimingMs(effectiveSettings.timing)
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setSettingsLoading(true)
+        const res = await fetch('/api/settings/player')
+        if (!res.ok) {
+          throw new Error(`Failed to fetch player settings: ${res.status}`)
+        }
+        const data = await res.json()
+        const serverSettings = (data?.settings ?? {}) as Partial<PlayerSettings>
+
+        setSettings(prev => ({
+          ...prev,
+          ...serverSettings
+        }))
+      } catch (err) {
+        console.error('Error loading player settings:', err)
+        setSettings(DEFAULT_SETTINGS)
+      } finally {
+        setSettingsLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [])
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/api/settings/player')
+          .then(res => res.json())
+          .then(data => {
+            const serverSettings = data?.settings || {}
+            setSettings(prev => ({ ...prev, ...serverSettings }))
+          })
+          .catch(err => console.error('Auto-refresh failed:', err))
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const isWithinOperatingHours = useCallback(() => {
+    const { startTime, endTime } = effectiveSettings
+
+    const parseHHMM = (time: string): number => {
+      const [h, m] = (time || '00:00').split(':').map(v => parseInt(v, 10) || 0)
+      return h * 60 + m
+    }
+
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const start = parseHHMM(startTime)
+    const end = parseHHMM(endTime)
+    if (start <= end) {
+      return nowMinutes >= start && nowMinutes < end
+    } else {
+      return nowMinutes >= start || nowMinutes < end
+    }
+  }, [effectiveSettings])
 
   useEffect(() => {
     const loadPhotos = async () => {
@@ -49,7 +144,7 @@ const PlayerPage: React.FC = () => {
         setError(null)
 
         const albumsResponse = await listAlbums({ limit: 100 })
-        let activeAlbum = albumsResponse.items.find(a => a.id === settings.activeAlbum)
+        let activeAlbum = albumsResponse.items.find(a => a.id === effectiveSettings.activeAlbum)
         if (!activeAlbum) activeAlbum = albumsResponse.items.find(a => a.enabled)
         if (!activeAlbum) activeAlbum = albumsResponse.items.find(a => a.id === 'favorites_builtin')
 
@@ -58,7 +153,9 @@ const PlayerPage: React.FC = () => {
           return
         }
 
-        const photosResponse = await getAlbumPhotos(activeAlbum.id, { limit: settings.maxImages || 100 })
+        const photosResponse = await getAlbumPhotos(activeAlbum.id, {
+          limit: effectiveSettings.maxImages || 100
+        })
 
         if (photosResponse.items.length === 0) {
           setError(`No photos in album "${activeAlbum.name}". Try refreshing the album.`)
@@ -77,12 +174,14 @@ const PlayerPage: React.FC = () => {
       }
     }
 
-    loadPhotos()
-  }, [settings.activeAlbum, settings.maxImages])
+    if (!settingsLoading) {
+      loadPhotos()
+    }
+  }, [effectiveSettings.activeAlbum, effectiveSettings.maxImages, settingsLoading])
 
   const getResolvedIndex = (idx: number) => {
     if (photos.length === 0) return 0
-    return settings.order === 'shuffle'
+    return effectiveSettings.order === 'shuffle'
         ? shuffledIndices[idx % shuffledIndices.length]
         : idx % photos.length
   }
@@ -100,9 +199,15 @@ const PlayerPage: React.FC = () => {
   }, [photos.length, isAnimating, computeNextIndex])
 
   useEffect(() => {
-    if (nextIndex == null) { setNextReady(false); return }
+    if (nextIndex == null) {
+      setNextReady(false)
+      return
+    }
     const next = photos[getResolvedIndex(nextIndex)]
-    if (!next?.url) { setNextReady(true); return }
+    if (!next?.url) {
+      setNextReady(true)
+      return
+    }
 
     const img = new Image()
     img.decoding = 'async'
@@ -119,18 +224,19 @@ const PlayerPage: React.FC = () => {
   useEffect(() => {
     if (nextIndex == null || !nextReady) return
 
-    if (settings.transition === 'none') {
+    if (effectiveSettings.transition === 'none') {
       setCurrentIndex(nextIndex)
       setNextIndex(null)
       setIsAnimating(false)
       return
     }
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setIsAnimating(true)
       })
     })
-  }, [nextIndex, nextReady, settings.transition])
+  }, [nextIndex, nextReady, effectiveSettings.transition])
 
   const onAnimationEnd = useCallback(() => {
     if (nextIndex == null) return
@@ -141,17 +247,19 @@ const PlayerPage: React.FC = () => {
 
   useEffect(() => {
     if (!isAnimating || nextIndex == null) return
-    const safety = window.setTimeout(() => { onAnimationEnd() }, TRANSITION_MS + 200)
+    const safety = window.setTimeout(() => {
+      onAnimationEnd()
+    }, TRANSITION_MS + 200)
     return () => window.clearTimeout(safety)
   }, [isAnimating, nextIndex, onAnimationEnd])
 
   useEffect(() => {
-    if (settings.order === 'shuffle' && photos.length > 0) {
+    if (effectiveSettings.order === 'shuffle' && photos.length > 0) {
       const indices = Array.from({ length: photos.length }, (_, i) => i)
       setShuffledIndices(shuffleArray(indices))
       setCurrentIndex(0)
     }
-  }, [settings.order, photos.length])
+  }, [effectiveSettings.order, photos.length])
 
   useEffect(() => {
     if (photos.length === 0 || !isWithinOperatingHours()) return
@@ -167,11 +275,15 @@ const PlayerPage: React.FC = () => {
   const stopPropagation: React.MouseEventHandler<HTMLDivElement> = e => e.stopPropagation()
 
   const goSettings = useCallback(() => {
-    try { navigate('/settings') } catch { window.location.href = '/settings' }
+    try {
+      navigate('/settings')
+    } catch {
+      window.location.href = '/settings'
+    }
   }, [navigate])
 
   const getBackgroundClasses = () => {
-    const bgType = settings.background || 'black'
+    const bgType = effectiveSettings.background || 'black'
     const classes = ['player-background']
 
     if (bgType === 'black') {
@@ -186,7 +298,7 @@ const PlayerPage: React.FC = () => {
   }
 
   const getBackgroundImageStyle = () => {
-    if (settings.background === 'blur') {
+    if (effectiveSettings.background === 'blur') {
       const currentPhoto = photos[getResolvedIndex(currentIndex)]
       if (currentPhoto?.url) {
         return { backgroundImage: `url(${currentPhoto.url})` }
@@ -195,25 +307,36 @@ const PlayerPage: React.FC = () => {
     return {}
   }
 
-
   const SmartImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
-    const [panClass, setPanClass] = useState<'player-img-pan-horizontal' | 'player-img-pan-vertical'>('player-img-pan-horizontal')
+    const [panClass, setPanClass] = useState<
+        'player-img-pan-horizontal' | 'player-img-pan-vertical'
+    >('player-img-pan-horizontal')
+
     const handleLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
       const img = e.currentTarget
       const isPortrait = img.naturalHeight >= img.naturalWidth
       setPanClass(isPortrait ? 'player-img-pan-vertical' : 'player-img-pan-horizontal')
     }, [])
-    return <img src={src} alt={alt} className={panClass} draggable={false} decoding="async" onLoad={handleLoad} />
+
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={panClass}
+            draggable={false}
+            decoding="async"
+            onLoad={handleLoad}
+        />
+    )
   }
+
   const renderGrid = (baseIndex: number) => {
     const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
     return (
         <div className="player-grid-2x1">
           {items.map((p, i) => (
               <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-horizontal">
-                {p && (
-                    <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
-                )}
+                {p && <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />}
               </div>
           ))}
         </div>
@@ -224,15 +347,13 @@ const PlayerPage: React.FC = () => {
     const photo = photos[getResolvedIndex(baseIndex)]
     if (!photo) return null
 
-    if (settings.layout === 'split') {
+    if (effectiveSettings.layout === 'split') {
       const items = Array.from({ length: 2 }, (_, i) => photos[getResolvedIndex(baseIndex + i)])
       return (
           <div className="player-grid-split">
             {items.map((p, i) => (
                 <div key={`${p?.id ?? 'ph'}-${i}`} className="player-cell-vertical">
-                  {p && (
-                      <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />
-                  )}
+                  {p && <SmartImage src={p.url} alt={p.caption || `Photo ${i + 1}`} />}
                 </div>
             ))}
           </div>
@@ -253,13 +374,13 @@ const PlayerPage: React.FC = () => {
   }
 
   const renderByLayout = (idx: number) => {
-    if (settings.layout === 'grid') return renderGrid(idx)
+    if (effectiveSettings.layout === 'grid') return renderGrid(idx)
     return renderSingle(idx)
   }
 
   const outsideHours = !isWithinOperatingHours()
 
-  if (loading) {
+  if (loading || settingsLoading) {
     return (
         <div className="player-loading">
           <div className="player-loading-text">Loading photos...</div>
@@ -282,7 +403,7 @@ const PlayerPage: React.FC = () => {
             <h2 className="player-inactive-title">Display Inactive</h2>
             <p className="player-inactive-message">Outside operating hours</p>
             <p className="player-inactive-hours">
-              Active from {settings.startTime} to {settings.endTime}
+              Active from {effectiveSettings.startTime} to {effectiveSettings.endTime}
             </p>
             <button onClick={goSettings} className="player-inactive-button">
               Open Settings
@@ -292,29 +413,33 @@ const PlayerPage: React.FC = () => {
     )
   }
 
-  const isFade = settings.transition === 'fade'
-  const isSlide = settings.transition === 'slide'
+  const isFade = effectiveSettings.transition === 'fade'
+  const isSlide = effectiveSettings.transition === 'slide'
 
   const currentLayerClass =
       isFade
-          ? (isAnimating ? 'player-transparent' : 'player-opaque')
+          ? isAnimating
+              ? 'player-transparent'
+              : 'player-opaque'
           : isSlide
-              ? (isAnimating
-                  ? (direction === 'left'
+              ? isAnimating
+                  ? direction === 'left'
                       ? 'player-translate-left player-transparent'
-                      : 'player-translate-right player-transparent')
-                  : 'player-translate-0 player-opaque')
+                      : 'player-translate-right player-transparent'
+                  : 'player-translate-0 player-opaque'
               : 'player-opaque'
 
   const nextLayerClass =
       isFade
-          ? (isAnimating ? 'player-opaque' : 'player-transparent')
+          ? isAnimating
+              ? 'player-opaque'
+              : 'player-transparent'
           : isSlide
-              ? (isAnimating
+              ? isAnimating
                   ? 'player-translate-0 player-opaque'
-                  : (direction === 'left'
+                  : direction === 'left'
                       ? 'player-translate-right player-transparent'
-                      : 'player-translate-left player-transparent'))
+                      : 'player-translate-left player-transparent'
               : 'player-transparent'
 
   return (
@@ -328,7 +453,7 @@ const PlayerPage: React.FC = () => {
       >
         <div className={getBackgroundClasses()} style={getBackgroundImageStyle()} />
 
-        {settings.background === 'blur' && (
+        {effectiveSettings.background === 'blur' && (
             <div className="player-background-overlay" />
         )}
 
@@ -343,7 +468,10 @@ const PlayerPage: React.FC = () => {
         </div>
 
         {nextIndex != null && (
-            <div className={['player-layer', nextLayerClass].join(' ')} onTransitionEnd={onAnimationEnd}>
+            <div
+                className={['player-layer', nextLayerClass].join(' ')}
+                onTransitionEnd={onAnimationEnd}
+            >
               {renderByLayout(nextIndex)}
             </div>
         )}

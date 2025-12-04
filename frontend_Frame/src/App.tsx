@@ -4,7 +4,6 @@ import { SettingsProvider } from './contexts/SettingsContext'
 import Header from './components/Header'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
-import SettingsPage from './pages/SettingsPage'
 import PlayerPage from './pages/PlayerPage'
 import WelcomePage from './pages/WelcomePage'
 
@@ -32,14 +31,7 @@ function App() {
                                     <main>
                                         <Routes>
                                             <Route path="/login" element={<LoginPage />} />
-                                            <Route
-                                                path="/settings"
-                                                element={
-                                                    <ProtectedRoute>
-                                                        <SettingsPage />
-                                                    </ProtectedRoute>
-                                                }
-                                            />
+
                                         </Routes>
                                     </main>
                                 </div>
