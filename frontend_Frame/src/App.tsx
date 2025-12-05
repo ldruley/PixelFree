@@ -1,7 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
-import { SettingsProvider } from './contexts/SettingsContext'
-import Header from './components/Header'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import PlayerPage from './pages/PlayerPage'
@@ -10,7 +8,6 @@ import WelcomePage from './pages/WelcomePage'
 function App() {
     return (
         <AuthProvider>
-            <SettingsProvider>
                 <Router>
                     <Routes>
                         <Route path="/welcome" element={<WelcomePage />} />
@@ -27,7 +24,7 @@ function App() {
                             path="/*"
                             element={
                                 <div>
-                                    <Header />
+
                                     <main>
                                         <Routes>
                                             <Route path="/login" element={<LoginPage />} />
@@ -39,7 +36,7 @@ function App() {
                         />
                     </Routes>
                 </Router>
-            </SettingsProvider>
+
         </AuthProvider>
     )
 }
