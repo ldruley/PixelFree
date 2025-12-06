@@ -17,7 +17,7 @@ const LoginPage: React.FC = () => {
       setTimeout(() => {
         setShowSuccess(false)
         if (authStatus.isAuthenticated) {
-          navigate('/')
+          navigate('/welcome')
         }
       }, 0)
     }

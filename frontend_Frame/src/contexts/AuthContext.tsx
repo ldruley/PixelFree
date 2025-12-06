@@ -8,7 +8,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
-  refreshAuthStatus: () => Promise<void>;
+  refreshAuthStatus: (showLoading?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,16 +21,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [authStatus, setAuthStatus] = useState<AuthStatus>({ isAuthenticated: false });
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshAuthStatus = async () => {
+  const refreshAuthStatus = async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const status = await checkAuthStatus();
       setAuthStatus(status);
     } catch (error) {
       console.error('Failed to refresh auth status:', error);
       setAuthStatus({ isAuthenticated: false });
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
@@ -57,8 +57,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshAuthStatus();
 
     // Listen for focus events (user returning from OAuth)
+    // Only refresh if we've been away for more than 30 seconds
+    let lastFocusTime = Date.now();
     const handleFocus = () => {
-      refreshAuthStatus();
+      const now = Date.now();
+      if (now - lastFocusTime > 30000) { // 30 seconds
+        // Don't show loading spinner for background refreshes
+        refreshAuthStatus(false);
+      }
+      lastFocusTime = now;
     };
 
     window.addEventListener('focus', handleFocus);
@@ -74,9 +81,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider value={value}>
+        {children}
+      </AuthContext.Provider>
   );
 };
 

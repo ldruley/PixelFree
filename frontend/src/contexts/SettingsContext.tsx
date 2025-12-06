@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 
 export interface PlayerSettings {
   // Layout settings
+  background: 'black' | 'blur' | 'gradient'
   layout: 'single' | 'grid' | 'split'
   
   // Transition settings
@@ -42,7 +43,8 @@ const defaultSettings: PlayerSettings = {
   endTime: '22:00',
   maxImages: 100,
   recencyWindow: 30,
-  activeAlbum: 'favorites'
+  activeAlbum: 'favorites',
+  background: "blur"
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)

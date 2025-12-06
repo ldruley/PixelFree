@@ -1747,14 +1747,14 @@ body {
 .album-placeholder {
   width: 100%;
   height: 100%;
-  background: url('/playerlogo.png') center/40% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%);
+  background: url('../../public/playerlogo.png') center/40% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%);
 }
 
 .preview-empty-slot {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url('/playerlogo.png') center/30% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%) !important;
+  background: url('../../public/playerlogo.png') center/30% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%) !important;
 }
 
 .empty-slot-content {
@@ -1766,7 +1766,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: url('/playerlogo.png') center/20% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%);
+  background: url('../../public/playerlogo.png') center/20% no-repeat, linear-gradient(135deg, #E0F2FE 0%, #F5F7FA 100%);
 }
 
 .no-photo p {
@@ -2528,4 +2528,116 @@ body {
 .img-error-fallback-large {
   padding: 40px;
   object-fit: contain;
+}
+.background-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 6px;
+}
+
+.background-btn {
+  padding: 10px 12px;
+  border: none;
+  background: #FAFAFA;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333333;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.3s;
+}
+
+.background-btn:hover {
+  background: #F0F0F0;
+}
+
+.background-btn.active {
+  background: #5AA9E6;
+  color: #FFFFFF;
+}
+
+.btn-save-settings {
+  width: 100%;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: #5AA9E6;
+  color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn-save-settings:hover:not(:disabled) {
+  background: #4A99D6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(90, 169, 230, 0.3);
+}
+
+.btn-save-settings:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.settings-save-status,
+.display-save-status {
+  margin-top: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+}
+
+.text-error {
+  color: #c62828;
+}
+
+.text-success {
+  color: #1e7e34;
+}
+.displaypage-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.displaypage-actions .display-save {
+  margin-left: 10px;
+}
+.preview-equals {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 4px;
+}
+
+.preview-equals-item {
+  flex: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e5e5e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-equals-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.layout-icon.split-vertical1 {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 24px;
+  width: 24px;
 }

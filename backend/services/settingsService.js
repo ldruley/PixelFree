@@ -20,7 +20,8 @@ const DEFAULT_PLAYER_SETTINGS = {
     endTime: '22:00',
     maxImages: 100,
     recencyWindow: 30,
-    activeAlbum: 'favorites'
+    activeAlbum: 'favorites',
+    background:'blur'
 };
 
 // Valid values for player settings
@@ -29,6 +30,7 @@ const VALID_LAYOUTS = ['single', 'grid', 'split'];
 const VALID_TRANSITIONS = ['none', 'fade', 'slide'];
 const VALID_TIMINGS = ['10s', '30s', '1m'];
 const VALID_ORDERS = ['fixed', 'shuffle'];
+const VALID_BACKGROUND = ['black' , 'blur' , 'gradient'];
 
 /**
  * Get settings for a specific namespace and key

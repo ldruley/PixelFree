@@ -60,6 +60,7 @@ import { asyncHandler, errorMapper } from './utils/errorMapper.js';
 import { ValidationError } from './modules/errors.js';
 import mountSchedulerRoutes from "./api/schedulerRoutes.js";
 import mountFavoritesRoutes from "./api/favoritesRoutes.js";
+import mountSettingsRoutes from './api/settingsRoutes.js';
 
 // --- API Routes ---
 
@@ -68,7 +69,7 @@ app.get('/', (_req, res) => {
   res.json({ 
     message: 'PixelFree backend API is running',
     frontend: 'http://localhost:5173',
-    endpoints: ['/api/auth', '/api/photos', '/api/albums', '/api/scheduler', '/api/favorites', '/api/health']
+    endpoints: ['/api/auth', '/api/photos', '/api/albums', '/api/scheduler', '/api/favorites', '/api/health', '/api/settings' ]
   });
 });
 
@@ -81,12 +82,14 @@ mountAlbumRoutes(app, {
 });
 mountSchedulerRoutes(app);
 mountFavoritesRoutes(app);
+mountSettingsRoutes(app);
+
 
 // --- Start server ---
 app.listen(PORT, () => {
   console.log(`PixelFree backend API listening at http://localhost:${PORT}`);
   console.log(`Frontend available at http://localhost:5173`);
-  console.log(`API endpoints: /api/auth, /api/photos, /api/albums, /api/scheduler, /api/favorites, /api/health`);
+  console.log(`API endpoints: /api/auth, /api/photos, /api/albums, /api/scheduler, /api/favorites, /api/health,  '/api/settings' `);
 });
 
 (async () => {

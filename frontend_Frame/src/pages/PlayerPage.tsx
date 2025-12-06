@@ -4,39 +4,13 @@ import type { Photo } from '../services/photoService'
 import { getAlbumPhotos, listAlbums } from '../services/albumService'
 import Header from '../components/Header'
 import '../styles/player.css'
+import {
+  DEFAULT_SETTINGS,
+  fetchPlayerSettings,
+  type PlayerSettings,
+} from '../services/settingsService'
 
 const TRANSITION_MS = 1200
-
-type PlayerLayout = 'single' | 'grid' | 'split'
-type PlayerTransition = 'none' | 'fade' | 'slide'
-type PlayerOrder = 'fixed' | 'shuffle'
-type PlayerBackground = 'black' | 'gradient' | 'blur'
-
-type PlayerSettings = {
-  layout: PlayerLayout
-  transition: PlayerTransition
-  timing: string
-  order: PlayerOrder
-  startTime: string 
-  endTime: string   
-  maxImages: number
-  recencyWindow: number
-  activeAlbum: string
-  background?: PlayerBackground
-}
-
-const DEFAULT_SETTINGS: PlayerSettings = {
-  layout: 'single',
-  transition: 'fade',
-  timing: '10s',
-  order: 'shuffle',
-  startTime: '08:00',
-  endTime: '22:00',
-  maxImages: 100,
-  recencyWindow: 30,
-  activeAlbum: 'favorites',
-  background: 'black'
-}
 
 const PlayerPage: React.FC = () => {
   const navigate = useNavigate()
@@ -79,20 +53,16 @@ const PlayerPage: React.FC = () => {
 
   const intervalMs = parseTimingMs(effectiveSettings.timing)
 
+  // Initial settings load
   useEffect(() => {
     const loadSettings = async () => {
       try {
         setSettingsLoading(true)
-        const res = await fetch('/api/settings/player')
-        if (!res.ok) {
-          throw new Error(`Failed to fetch player settings: ${res.status}`)
-        }
-        const data = await res.json()
-        const serverSettings = (data?.settings ?? {}) as Partial<PlayerSettings>
+        const serverSettings = await fetchPlayerSettings()
 
         setSettings(prev => ({
           ...prev,
-          ...serverSettings
+          ...serverSettings,
         }))
       } catch (err) {
         console.error('Error loading player settings:', err)
@@ -104,12 +74,12 @@ const PlayerPage: React.FC = () => {
 
     loadSettings()
   }, [])
+
+  // Auto-refresh settings every 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch('/api/settings/player')
-          .then(res => res.json())
-          .then(data => {
-            const serverSettings = data?.settings || {}
+      fetchPlayerSettings()
+          .then(serverSettings => {
             setSettings(prev => ({ ...prev, ...serverSettings }))
           })
           .catch(err => console.error('Auto-refresh failed:', err))
@@ -154,7 +124,7 @@ const PlayerPage: React.FC = () => {
         }
 
         const photosResponse = await getAlbumPhotos(activeAlbum.id, {
-          limit: effectiveSettings.maxImages || 100
+          limit: effectiveSettings.maxImages || 100,
         })
 
         if (photosResponse.items.length === 0) {
@@ -272,6 +242,7 @@ const PlayerPage: React.FC = () => {
     if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current)
     hideTimerRef.current = window.setTimeout(() => setShowHeader(false), 3000)
   }
+
   const stopPropagation: React.MouseEventHandler<HTMLDivElement> = e => e.stopPropagation()
 
   const goSettings = useCallback(() => {
