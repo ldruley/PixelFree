@@ -11,10 +11,12 @@ Each member has a defined area of focus to ensure smooth collaboration and clear
 
 | Name | Role | Responsibilities | Contact |
 |------|------|------------------|----------|
-| **[Logan Druley]** | 🧠 **Backend Lead** | Oversees Backend, reviews PRs, main powerhouse of Backend | [@ldruley](https://github.com/ldruley) |
-| **[Hani A.B.]** | 🧠 **Frontend Lead** | Oversees Frontend, reviews PRs, main powerhouse of Frontend | [@the2stura](https://github.com/the2stura) |
-| **[Gustavo Javier]** | ⚙️ **Backend / Frontend** | Works both Frontend/Backend | [@gusjavi](https://github.com/gusjavi) |
-| **[Priscilla Felix-Sandoval]** | 🎨 **Design Lead** | Designs Frontend , CD,  | 
+| **Logan Druley** | 🧠 **Backend Lead** | Oversees Backend, reviews PRs, main powerhouse of Backend | [@ldruley](https://github.com/ldruley) |
+| **Hani A.B.** | 🧠 **Frontend Lead** | Oversees Frontend, reviews PRs, main powerhouse of Frontend | [@the2stura](https://github.com/the2stura) |
+| **Gustavo Javier** | ⚙️ **Backend / Frontend** | Works both Frontend/Backend | [@gusjavi](https://github.com/gusjavi) |
+| **Priscilla Felix-Sandoval** | 🎨 **Design Lead** | Designs Frontend , CD  | 
+| **Joe Pasqua** | 😎 **Mentor** | Mentor - Guidance throughout the project | [jpasqua](https://github.com/jpasqua) |
+
 ---
 ## 📁 Links to Important Places
 
@@ -22,9 +24,10 @@ Each member has a defined area of focus to ensure smooth collaboration and clear
 |------|------|
 | **CheckList** | [User Stories & CheckList](https://github.com/ldruley/PixelFree/blob/main/docs/USER_STORIES.md) |
 | **Backend** | [Backend Folder](https://github.com/ldruley/PixelFree/tree/main/backend) |
-| **Settings Frontend** | [Frontend Folder](https://github.com/ldruley/PixelFree/tree/main/frontend) |
+| **Settings Frontend** | [Settings Frontend Folder](https://github.com/ldruley/PixelFree/tree/main/frontend) |
 | **Frame Frontend** | [Frame Frontend Folder](https://github.com/ldruley/PixelFree/tree/main/frontend_Frame) |
 | **Unit Testing** | [Unit Testing](https://github.com/ldruley/PixelFree/blob/main/backend/doc/Unit_Test.md) |
+| **Original Repo** | [Original Repo](https://github.com/jpasqua/PixelFree) |
 
 
 
