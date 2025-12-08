@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS media_manifest (
   path              TEXT NOT NULL,
   content_length    INTEGER,
   fetched_at        TEXT,
+  expires_at        TEXT,
   last_accessed_at  TEXT,
   PRIMARY KEY (status_id, kind),
   FOREIGN KEY (status_id) REFERENCES photos(status_id) ON DELETE CASCADE
