@@ -476,6 +476,50 @@ export async function preload(photos, kind = 'preview', maxConcurrent = 3) {
 }
 
 /**
+ * Get all cached media for a specific status_id.
+ *
+ * @param {string} statusId - Photo/status ID
+ * @returns {Array<object>} - Array of media manifest entries
+ */
+export function getAllForStatus(statusId) {
+    return mediaCacheRepo.getAllForStatus(statusId);
+}
+
+/**
+ * Delete cached media for a specific status_id and kind.
+ *
+ * @param {string} statusId - Photo/status ID
+ * @param {string} kind - Media type ('preview' or 'original')
+ * @returns {Promise<boolean>} - True if successfully deleted
+ */
+export async function deleteCachedMedia(statusId, kind) {
+    const entry = mediaCacheRepo.get(statusId, kind);
+
+    if (!entry) {
+        return false;
+    }
+
+    const absolutePath = path.join(mediaStorage.getCacheRoot(), entry.path);
+
+    try {
+        // Delete from filesystem
+        await mediaStorage.deleteMedia(absolutePath);
+
+        // Delete from database
+        mediaCacheRepo.remove(statusId, kind);
+
+        return true;
+    } catch (error) {
+        console.error(`[MediaService] Failed to delete ${statusId}/${kind}:`, error.message);
+
+        // Even if file deletion failed, remove from database to keep them in sync
+        mediaCacheRepo.remove(statusId, kind);
+
+        throw error;
+    }
+}
+
+/**
  * Initialize media cache system.
  * Should be called on application startup.
  *
