@@ -11,8 +11,6 @@ const SharedLayout: React.FC = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -42,13 +40,10 @@ const SharedLayout: React.FC = () => {
 
   return (
       <div className="app-simple-header">
-
-        {/* Centered Larger Logo */}
         <div className="simple-header-logo">
           <img src="/pixelfree-logo.svg" alt="PixelFree" />
         </div>
 
-        {/* Avatar + Dropdown */}
         {authStatus.user && (
             <div className="simple-header-avatar-wrapper" ref={menuRef}>
               <div
@@ -83,9 +78,6 @@ const SharedLayout: React.FC = () => {
         )}
       </div>
   );
-
-
 };
-
 export default SharedLayout;
 

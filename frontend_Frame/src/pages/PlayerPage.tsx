@@ -353,9 +353,12 @@ const PlayerPage: React.FC = () => {
 
   if (loading || settingsLoading) {
     return (
-        <div className="player-loading">
+        <>
+        <div className="auth-background"/>
+        <div className="page-container ">
           <div className="player-loading-text">Loading photos...</div>
         </div>
+        </>
     )
   }
 

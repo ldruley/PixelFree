@@ -1,36 +1,38 @@
 import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Header from '../components/Header'
+import '../styles/player.css'
 
 const WelcomePage: React.FC = () => {
     const navigate = useNavigate()
-
     useEffect(() => {
-        // stay for 3 seconds then go to player
         const timer = setTimeout(() => {
-            navigate('/')
-        }, 5000)
+            navigate('/player')
+        }, 3000)
+
         return () => clearTimeout(timer)
     }, [navigate])
 
     return (
-        <div
-            style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'black',
-                color: 'white',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'sans-serif',
-            }}
-        >
-            <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>Welcome</h1>
-            <p style={{ fontSize: '1.5rem', opacity: 0.8 }}>
-                Loading your photo display...
-            </p>
+        <>
+            <div className="auth-background" />
+        <div className="page-container ">
+            <Header />
+
+            <div className="welcome-content">
+                <div className="welcome-logo-group">
+                    <h1 className="welcome-title">Welcome to</h1>
+                    <img
+                        className="welcome-image"
+                        src="/pixelfree-logo.svg"
+                        alt="PixelFree"
+                    />
+                </div>
+                <p className="welcome-subtitle">Loading your photo display…</p>
+            </div>
+
         </div>
+            </>
     )
 }
 
